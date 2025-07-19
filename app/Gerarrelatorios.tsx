@@ -6,51 +6,59 @@ import * as Sharing from 'expo-sharing';
 import * as FileSystem from 'expo-file-system';
 import * as XLSX from 'xlsx';
 import { Venda } from '../src/types';
-import { listarTodasVendasSQLite } from '../src/database/sqlite';
+import { listarVendasPorPeriodoSQLite } from '../src/database/sqlite';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
+import DateTimePicker, { DateTimePickerEvent } from '@react-native-community/datetimepicker';
 
 export default function GerarRelatoriosScreen() {
   const [isLoadingPDF, setIsLoadingPDF] = useState(false);
-  const [isLoadingCSV, setIsLoadingCSV] = useState(false);
   const [isLoadingXLSX, setIsLoadingXLSX] = useState(false);
   const router = useRouter();
+
+  const [dataInicio, setDataInicio] = useState<Date | null>(null);
+  const [dataFim, setDataFim] = useState<Date | null>(null);
+  const [showDatePicker, setShowDatePicker] = useState<'inicio' | 'fim' | null>(null);
 
   const calcularValorPagoVenda = (venda: Venda): number => {
     return venda.pagamentos?.reduce((acc, p) => acc + p.valorPago, 0) || 0;
   };
 
-  // --- Lógica para PDF ---
-  const gerarConteudoHTML = async (): Promise<string> => {
-    let htmlContent = `
-      <html>
-        <head>
-          <meta charset="UTF-8">
-          <style>
-            body { font-family: Arial, Helvetica, sans-serif; margin: 20px; color: #333; }
-            h1 { color: #6200EE; text-align: center; border-bottom: 2px solid #6200EE; padding-bottom: 10px; }
-            h2 { color: #3700B3; margin-top: 30px; border-bottom: 1px solid #ccc; padding-bottom: 5px;}
-            h3 { color: #444; margin-top: 20px; }
-            table { width: 100%; border-collapse: collapse; margin-bottom: 15px; font-size: 0.9em; }
-            th, td { border: 1px solid #ddd; padding: 6px; text-align: left; }
-            th { background-color: #f0f0f0; font-weight: bold; }
-            .resumo-geral { background-color: #e9e0ff; padding: 15px; margin-bottom: 25px; border-radius: 8px; }
-            .resumo-geral p, .subtotal-cliente p { margin: 5px 0; }
-            .cliente-bloco { page-break-inside: avoid; margin-bottom: 25px; padding-bottom:15px; border-bottom: 1px dashed #aaa; }
-            .total-geral strong { font-size: 1.1em; }
-            .text-right { text-align: right; }
-            .currency:before { content: "R$ "; }
-          </style>
-        </head>
-        <body>
-          <h1>Relatório Consolidado de Vendas</h1>
-    `;
+  const onDateChange = (event: DateTimePickerEvent, selectedDate?: Date) => {
+    const currentDate = selectedDate || (showDatePicker === 'inicio' ? dataInicio : dataFim);
+    setShowDatePicker(null);
+    if (event.type === 'set' && currentDate) {
+      if (showDatePicker === 'inicio') {
+        setDataInicio(currentDate);
+      } else {
+        setDataFim(currentDate);
+      }
+    }
+  };
 
+  const fetchVendasDoPeriodo = async (): Promise<Venda[] | null> => {
+    if (!dataInicio || !dataFim) {
+      Alert.alert("Atenção", "Por favor, selecione uma data de início e uma data de fim.");
+      return null;
+    }
+    if (dataInicio > dataFim) {
+      Alert.alert("Erro", "A data de início não pode ser posterior à data de fim.");
+      return null;
+    }
+    const inicioDoDia = new Date(dataInicio.setHours(0, 0, 0, 0));
+    const fimDoDia = new Date(dataFim.setHours(23, 59, 59, 999));
+    const vendas = await listarVendasPorPeriodoSQLite(inicioDoDia.toISOString(), fimDoDia.toISOString());
+    if (vendas.length === 0) {
+      Alert.alert("Relatório Vazio", "Nenhuma venda encontrada no período selecionado.");
+      return null;
+    }
+    return vendas;
+  };
+  
+  const gerarConteudoHTML = (vendas: Venda[], dataInicio: Date, dataFim: Date): string => {
     let valorTotalGeralVendido = 0;
     let valorTotalGeralPago = 0;
     
-    try {
-      const todasAsVendas = await listarTodasVendasSQLite();
-      const vendasPorCliente = todasAsVendas.reduce((acc, venda) => {
+    const vendasPorCliente = vendas.reduce((acc, venda) => {
         const id = venda.idCliente;
         if (!acc[id]) {
           acc[id] = { clienteNome: venda.clienteNome, clienteTelefone: venda.clienteTelefone, vendas: [] };
@@ -60,205 +68,127 @@ export default function GerarRelatoriosScreen() {
       }, {} as Record<string, { clienteNome: string; clienteTelefone?: string | null; vendas: Venda[] }>);
 
       const clientesComVendasCount = Object.keys(vendasPorCliente).length;
-      htmlContent += `<h2>Clientes e Suas Vendas</h2>`;
 
+      let corpoTabela = '';
       for (const idCliente in vendasPorCliente) {
         const dadosCliente = vendasPorCliente[idCliente];
-        htmlContent += `<div class="cliente-bloco"><h3>Cliente: ${dadosCliente.clienteNome}</h3>`;
-        if (dadosCliente.clienteTelefone) htmlContent += `<p>Telefone: ${dadosCliente.clienteTelefone}</p>`;
+        corpoTabela += `<div class="cliente-bloco"><h3>Cliente: ${dadosCliente.clienteNome}</h3>`;
+        if (dadosCliente.clienteTelefone) corpoTabela += `<p>Telefone: ${dadosCliente.clienteTelefone}</p>`;
         
         let subtotalVendidoCliente = 0;
         let subtotalPagoCliente = 0;
 
-        htmlContent += `<table><thead><tr><th>Data</th><th>Itens da Venda</th><th class="text-right">Valor Venda</th><th class="text-right">Pago</th><th class="text-right">Pendente</th></tr></thead><tbody>`;
+        corpoTabela += `<table><thead><tr><th>Data</th><th>Itens</th><th>Total</th><th>Pago</th><th>Pendente</th></tr></thead><tbody>`;
         for (const venda of dadosCliente.vendas) {
             const valorPagoVenda = calcularValorPagoVenda(venda);
-            const saldoDevedorVenda = venda.valorTotal - valorPagoVenda;
             subtotalVendidoCliente += venda.valorTotal;
             subtotalPagoCliente += valorPagoVenda;
             valorTotalGeralVendido += venda.valorTotal;
             valorTotalGeralPago += valorPagoVenda;
             const itensHtml = venda.itens?.map(p => `${p.quantidade}x ${p.descricao}`).join('<br>') || 'N/A';
-
-            htmlContent += `
-              <tr>
-                <td>${new Date(venda.dataVenda).toLocaleDateString('pt-BR')}</td>
-                <td>${itensHtml}</td> 
-                <td class="text-right"><span class="currency">${venda.valorTotal.toFixed(2)}</span></td>
-                <td class="text-right"><span class="currency">${valorPagoVenda.toFixed(2)}</span></td>
-                <td class="text-right"><span class="currency">${saldoDevedorVenda.toFixed(2)}</span></td>
-              </tr>
-            `;
+            corpoTabela += `<tr><td>${new Date(venda.dataVenda).toLocaleDateString('pt-BR')}</td><td>${itensHtml}</td><td class="text-right">R$ ${venda.valorTotal.toFixed(2)}</td><td class="text-right">R$ ${valorPagoVenda.toFixed(2)}</td><td class="text-right">R$ ${(venda.valorTotal - valorPagoVenda).toFixed(2)}</td></tr>`;
         }
-        htmlContent += `</tbody></table>`;
-        htmlContent += `<div class="subtotal-cliente"><p><strong>Subtotal para ${dadosCliente.clienteNome}:</strong></p><p>Vendido: <span class="currency">${subtotalVendidoCliente.toFixed(2)}</span> | Recebido: <span class="currency">${subtotalPagoCliente.toFixed(2)}</span> | Pendente: <span class="currency">${(subtotalVendidoCliente - subtotalPagoCliente).toFixed(2)}</span></p></div></div>`; 
+        corpoTabela += `</tbody></table>`;
+        corpoTabela += `<div class="subtotal-cliente"><p><strong>Subtotal para ${dadosCliente.clienteNome}:</strong> Vendido: R$ ${subtotalVendidoCliente.toFixed(2)} | Recebido: R$ ${subtotalPagoCliente.toFixed(2)}</p></div></div>`; 
       }
 
       const valorTotalGeralPendente = valorTotalGeralVendido - valorTotalGeralPago;
       const resumoGeralHtml = `
         <div class="resumo-geral">
-          <h2>Resumo Geral Consolidado</h2>
-          <p>Total de Clientes com Vendas Registradas: ${clientesComVendasCount}</p>
-          <p class="total-geral"><strong>Valor Total Vendido (Líquido): <span class="currency">${valorTotalGeralVendido.toFixed(2)}</span></strong></p>
-          <p class="total-geral"><strong>Total Geral Recebido: <span class="currency">${valorTotalGeralPago.toFixed(2)}</span></strong></p>
-          <p class="total-geral"><strong>Total Geral Pendente: <span class="currency">${valorTotalGeralPendente.toFixed(2)}</span></strong></p>
+          <h2>Resumo Geral do Período</h2>
+          <p><strong>Período:</strong> ${dataInicio.toLocaleDateString('pt-BR')} até ${dataFim.toLocaleDateString('pt-BR')}</p>
+          <p>Total de Clientes com Vendas: ${clientesComVendasCount}</p>
+          <p class="total-geral"><strong>Valor Total Vendido: R$ ${valorTotalGeralVendido.toFixed(2)}</strong></p>
+          <p class="total-geral"><strong>Total Geral Recebido: R$ ${valorTotalGeralPago.toFixed(2)}</strong></p>
+          <p class="total-geral"><strong>Total Geral Pendente: R$ ${valorTotalGeralPendente.toFixed(2)}</strong></p>
         </div>
       `;
-      const h1EndIndex = htmlContent.indexOf('</h1>') + 5;
-      htmlContent = htmlContent.slice(0, h1EndIndex) + resumoGeralHtml + htmlContent.slice(h1EndIndex);
-    } catch (error) {
-      console.error("Erro ao gerar dados para HTML:", error);
-      htmlContent += `<p style="color:red;">Erro ao carregar todos os dados para o relatório PDF.</p>`;
-    }
     
-    htmlContent += `</body></html>`;
-    return htmlContent;
+    return `
+      <html>
+        <head>
+          <meta charset="UTF-8">
+          <style>
+            body { font-family: Arial, sans-serif; margin: 20px; color: #333; } h1 { color: #6200EE; text-align: center; } h2 { color: #3700B3; border-bottom: 1px solid #ccc; padding-bottom: 5px; } h3 { color: #444; } table { width: 100%; border-collapse: collapse; margin-top: 15px; font-size: 0.9em; } th, td { border: 1px solid #ddd; padding: 6px; text-align: left; } th { background-color: #f2f2f2; } .resumo-geral { background-color: #e9e0ff; padding: 15px; border-radius: 8px; margin-bottom: 20px; } .cliente-bloco { page-break-inside: avoid; margin-bottom: 20px; } .text-right { text-align: right; } .total-geral {font-size: 1.1em;}
+          </style>
+        </head>
+        <body>
+          <h1>Relatório Consolidado de Vendas</h1>
+          ${resumoGeralHtml}
+          <h2>Detalhes por Cliente</h2>
+          ${corpoTabela}
+        </body>
+      </html>
+    `;
   };
 
-  const handleGerarESalvarPDF = async () => {
+  const handleGerarPDF = async () => {
     setIsLoadingPDF(true);
-    const html = await gerarConteudoHTML();
-    if (html.includes("Erro ao carregar todos os dados")) {
-        Alert.alert("Erro", "Não foi possível gerar o PDF devido a um erro ao carregar os dados.");
-        setIsLoadingPDF(false);
-        return;
-    }
     try {
-      const { uri } = await Print.printToFileAsync({ html });
-      if (!(await Sharing.isAvailableAsync())) {
-        Alert.alert('Compartilhamento Indisponível', 'A funcionalidade de compartilhamento não está disponível neste dispositivo.');
-        setIsLoadingPDF(false);
-        return;
-      }
-      await Sharing.shareAsync(uri, { mimeType: 'application/pdf', dialogTitle: 'Compartilhar Relatório de Vendas (PDF)' });
-    } catch (error) {
-      console.error('Erro ao gerar ou compartilhar PDF:', error);
-      Alert.alert('Erro', 'Ocorreu um problema ao gerar ou compartilhar o PDF.');
-    } finally {
-      setIsLoadingPDF(false);
-    }
-  };
-
-  // --- Lógica para CSV ---
-  const gerarConteudoCSV = async (): Promise<string> => {
-    let csvString = "ID Cliente,Nome Cliente,Telefone Cliente,ID Venda,Data Venda,Itens da Venda,Subtotal,Desconto,Valor Total Venda,Valor Pago Venda,Saldo Devedor Venda\n";
-    let valorTotalGeralVendidoCSV = 0;
-    let valorTotalGeralPagoCSV = 0;
-    try {
-      const todasAsVendas = await listarTodasVendasSQLite();
-      for (const venda of todasAsVendas) {
-        const valorPagoVenda = calcularValorPagoVenda(venda);
-        const saldoDevedorVenda = venda.valorTotal - valorPagoVenda;
-        valorTotalGeralVendidoCSV += venda.valorTotal;
-        valorTotalGeralPagoCSV += valorPagoVenda;
-        
-        const itensCsv = venda.itens?.map(p => `${p.quantidade}x ${p.descricao}`).join('; ') || 'N/A';
-        const idClienteCsv = `"${venda.idCliente}"`;
-        const nomeClienteCsv = `"${venda.clienteNome.replace(/"/g, '""')}"`;
-        const telefoneClienteCsv = `"${(venda.clienteTelefone || '').replace(/"/g, '""')}"`;
-        const idVendaCsv = `"${venda.id}"`;
-        const dataVendaCsv = `"${new Date(venda.dataVenda).toLocaleDateString('pt-BR')}"`;
-        const produtoCsv = `"${itensCsv.replace(/"/g, '""')}"`;
-        const subtotalCsv = venda.subtotal.toFixed(2);
-        const descontoCsv = (venda.desconto || 0).toFixed(2);
-        const valorTotalCsv = venda.valorTotal.toFixed(2);
-        const valorPagoCsv = valorPagoVenda.toFixed(2);
-        const saldoDevedorCsv = saldoDevedorVenda.toFixed(2);
-
-        csvString += `${idClienteCsv},${nomeClienteCsv},${telefoneClienteCsv},${idVendaCsv},${dataVendaCsv},${produtoCsv},${subtotalCsv},${descontoCsv},${valorTotalCsv},${valorPagoCsv},${saldoDevedorCsv}\n`;
-      }
-      
-      csvString += "\n"; 
-      csvString += `TOTAL GERAL VENDIDO (LÍQUIDO):,,,,,,,,${valorTotalGeralVendidoCSV.toFixed(2)}\n`;
-      csvString += `TOTAL GERAL RECEBIDO:,,,,,,,,,${valorTotalGeralPagoCSV.toFixed(2)}\n`;
-      csvString += `TOTAL GERAL PENDENTE:,,,,,,,,,,${(valorTotalGeralVendidoCSV - valorTotalGeralPagoCSV).toFixed(2)}\n`;
-    } catch (error) {
-      console.error("Erro ao gerar dados para CSV:", error);
-      return "ERRO_AO_GERAR_DADOS_CSV"; 
-    }
-    return csvString;
-  };
-
-  const handleGerarESalvarCSV = async () => {
-    setIsLoadingCSV(true);
-    const csvString = await gerarConteudoCSV();
-    if (csvString === "ERRO_AO_GERAR_DADOS_CSV") {
-        Alert.alert("Erro", "Não foi possível gerar o CSV devido a um erro ao carregar os dados.");
-        setIsLoadingCSV(false);
-        return;
-    }
-    try {
-      const fileName = `RelatorioVendas_CVSApp_${new Date().toISOString().split('T')[0]}.csv`;
-      const fileUri = (FileSystem.cacheDirectory || FileSystem.documentDirectory) + fileName; 
-      await FileSystem.writeAsStringAsync(fileUri, csvString, { encoding: FileSystem.EncodingType.UTF8 });
-      if (!(await Sharing.isAvailableAsync())) {
-        Alert.alert('Compartilhamento Indisponível', 'A funcionalidade de compartilhamento não está disponível neste dispositivo.');
-        setIsLoadingCSV(false);
-        return;
-      }
-      await Sharing.shareAsync(fileUri, { mimeType: 'text/csv', dialogTitle: 'Compartilhar Relatório de Vendas (CSV)' });
-    } catch (error) {
-      console.error('Erro ao gerar ou compartilhar CSV:', error);
-      Alert.alert('Erro', 'Ocorreu um problema ao gerar ou compartilhar o CSV.');
-    } finally {
-      setIsLoadingCSV(false);
-    }
-  };
-
-  const handleGerarESalvarXLSX = async () => {
-    setIsLoadingXLSX(true);
-    try {
-        const todasAsVendas = await listarTodasVendasSQLite();
-        if (todasAsVendas.length === 0) {
-            Alert.alert("Atenção", "Nenhuma venda encontrada para gerar o relatório.");
+        const vendas = await fetchVendasDoPeriodo();
+        if (!vendas) {
+            setIsLoadingPDF(false); // Garante que o loading para se a função retornar
             return;
         }
 
-        const dadosParaPlanilha = todasAsVendas.map(venda => {
+        const html = gerarConteudoHTML(vendas, dataInicio!, dataFim!);
+        const { uri: tempUri } = await Print.printToFileAsync({ html });
+
+        // ✨ CORREÇÃO: Define um novo nome e caminho para o arquivo
+        const novoNome = `Relatorio-Vendas-${dataInicio!.toISOString().split('T')[0]}.pdf`;
+        const novoUri = FileSystem.cacheDirectory + novoNome;
+
+        // Move o arquivo temporário para o novo caminho com o nome correto
+        await FileSystem.moveAsync({
+            from: tempUri,
+            to: novoUri,
+        });
+
+        // Compartilha o arquivo a partir do novo caminho
+        await Sharing.shareAsync(novoUri, { mimeType: 'application/pdf', dialogTitle: 'Compartilhar Relatório PDF' });
+        
+    } catch (error) {
+        console.error("Erro ao gerar PDF:", error);
+        Alert.alert("Erro", "Não foi possível gerar o relatório PDF.");
+    } finally {
+        setIsLoadingPDF(false);
+    }
+};
+
+  const handleGerarXLSX = async () => {
+    setIsLoadingXLSX(true);
+    try {
+        const vendas = await fetchVendasDoPeriodo();
+        if (!vendas) return;
+
+        const dadosParaPlanilha = vendas.map(venda => {
             const valorPago = calcularValorPagoVenda(venda);
             return {
-                'Nome do Cliente': venda.clienteNome,
-                'Telefone': venda.clienteTelefone,
-                'Data da Venda': new Date(venda.dataVenda).toLocaleDateString('pt-BR'),
-                'Itens': venda.itens?.map(p => `${p.quantidade}x ${p.descricao}`).join('; '),
-                'Subtotal': venda.subtotal,
-                'Desconto': venda.desconto || 0,
-                'Valor Total': venda.valorTotal,
-                'Valor Pago': valorPago,
-                'Saldo Devedor': venda.valorTotal - valorPago,
-                'Status': (venda.valorTotal - valorPago) <= 0.001 ? 'Quitada' : 'Pendente'
+                'Nome do Cliente': venda.clienteNome, 'Telefone': venda.clienteTelefone, 'Data da Venda': new Date(venda.dataVenda), 'Itens': venda.itens?.map(p => `${p.quantidade}x ${p.descricao}`).join('; '), 'Subtotal': venda.subtotal, 'Desconto': venda.desconto || 0, 'Valor Total': venda.valorTotal, 'Valor Pago': valorPago, 'Saldo Devedor': venda.valorTotal - valorPago, 'Status': (venda.valorTotal - valorPago) <= 0.001 ? 'Quitada' : 'Pendente'
             };
         });
 
         const worksheet = XLSX.utils.json_to_sheet(dadosParaPlanilha);
+        worksheet['!cols'] = [ { wch: 25 }, { wch: 15 }, { wch: 12 }, { wch: 40 }, { wch: 10 }, { wch: 10 }, { wch: 10 }, { wch: 10 }, { wch: 12 }, { wch: 10 } ];
+        
+        // Formata a coluna de data
+        dadosParaPlanilha.forEach((_, index) => {
+            const cellRef = XLSX.utils.encode_cell({c: 2, r: index + 1}); // Coluna 'C' (Data da Venda)
+            if(worksheet[cellRef]) {
+                worksheet[cellRef].t = 'd';
+                worksheet[cellRef].z = 'dd/mm/yyyy';
+            }
+        });
+
         const workbook = XLSX.utils.book_new();
-        XLSX.utils.book_append_sheet(workbook, worksheet, "Relatório de Vendas");
-
-        worksheet['!cols'] = [
-            { wch: 25 }, { wch: 15 }, { wch: 12 }, { wch: 40 },
-            { wch: 10 }, { wch: 10 }, { wch: 10 }, { wch: 10 },
-            { wch: 12 }, { wch: 10 },
-        ];
-
+        XLSX.utils.book_append_sheet(workbook, worksheet, "Vendas");
         const wbout = XLSX.write(workbook, { type: 'base64', bookType: 'xlsx' });
         
-        const fileName = `RelatorioVendas_CVSApp_${new Date().toISOString().split('T')[0]}.xlsx`;
+        const fileName = `RelatorioVendas_${dataInicio!.toISOString().split('T')[0]}_a_${dataFim!.toISOString().split('T')[0]}.xlsx`;
         const fileUri = (FileSystem.cacheDirectory || FileSystem.documentDirectory) + fileName;
+        await FileSystem.writeAsStringAsync(fileUri, wbout, { encoding: FileSystem.EncodingType.Base64 });
         
-        await FileSystem.writeAsStringAsync(fileUri, wbout, {
-            encoding: FileSystem.EncodingType.Base64
-        });
-
-        if (!(await Sharing.isAvailableAsync())) {
-            Alert.alert('Erro', 'O compartilhamento não está disponível neste dispositivo.');
-            return;
-        }
-        
-        await Sharing.shareAsync(fileUri, {
-            mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-            dialogTitle: 'Compartilhar Relatório Excel',
-            UTI: 'com.microsoft.excel.xlsx'
-        });
+        await Sharing.shareAsync(fileUri, { mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', dialogTitle: 'Compartilhar Relatório Excel', UTI: 'com.microsoft.excel.xlsx' });
 
     } catch (error) {
         console.error("Erro ao gerar relatório XLSX:", error);
@@ -282,42 +212,44 @@ export default function GerarRelatoriosScreen() {
             
             <View style={styles.contentContainer}>
                 <Text style={styles.description}>
-                Exporte um relatório consolidado de todas as vendas registradas no aplicativo. Escolha o formato desejado abaixo.
+                  Selecione o período desejado e exporte um relatório consolidado das vendas.
                 </Text>
 
+                <View style={styles.datePickerContainer}>
+                    <TouchableOpacity style={styles.datePickerButton} onPress={() => setShowDatePicker('inicio')}>
+                        <MaterialCommunityIcons name="calendar-start" size={24} color="#E0E0FF" />
+                        <Text style={styles.datePickerText}>{dataInicio ? dataInicio.toLocaleDateString('pt-BR') : 'Data de Início'}</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity style={styles.datePickerButton} onPress={() => setShowDatePicker('fim')}>
+                        <MaterialCommunityIcons name="calendar-end" size={24} color="#E0E0FF" />
+                        <Text style={styles.datePickerText}>{dataFim ? dataFim.toLocaleDateString('pt-BR') : 'Data de Fim'}</Text>
+                    </TouchableOpacity>
+                </View>
+
+                {showDatePicker && (
+                    <DateTimePicker
+                        value={ (showDatePicker === 'inicio' ? dataInicio : dataFim) || new Date() }
+                        mode="date"
+                        display="default"
+                        onChange={onDateChange}
+                    />
+                )}
+
                 <TouchableOpacity 
-                    style={[styles.actionButton, styles.xlsxButton, (isLoadingPDF || isLoadingCSV || isLoadingXLSX) && {opacity: 0.5}]}
-                    onPress={handleGerarESalvarXLSX} 
-                    disabled={isLoadingPDF || isLoadingCSV || isLoadingXLSX}
+                    style={[styles.actionButton, styles.xlsxButton, (!dataInicio || !dataFim) && styles.disabledButton]}
+                    onPress={handleGerarXLSX} 
+                    disabled={isLoadingPDF || isLoadingXLSX || !dataInicio || !dataFim}
                 >
-                    {isLoadingXLSX ? 
-                        <ActivityIndicator size="small" color="#FFFFFF" /> : 
-                        <MaterialCommunityIcons name="microsoft-excel" size={28} color="#FFFFFF" />
-                    }
+                    {isLoadingXLSX ? <ActivityIndicator size="small" color="#FFFFFF" /> : <MaterialCommunityIcons name="microsoft-excel" size={28} color="#FFFFFF" />}
                     <Text style={styles.actionButtonText}>Exportar para Excel (.xlsx)</Text>
                 </TouchableOpacity>
 
                 <TouchableOpacity 
-                    style={[styles.actionButton, styles.csvButton, (isLoadingPDF || isLoadingCSV || isLoadingXLSX) && {opacity: 0.5}]}
-                    onPress={handleGerarESalvarCSV} 
-                    disabled={isLoadingPDF || isLoadingCSV || isLoadingXLSX}
+                    style={[styles.actionButton, styles.pdfButton, (!dataInicio || !dataFim) && styles.disabledButton]}
+                    onPress={handleGerarPDF} 
+                    disabled={isLoadingPDF || isLoadingXLSX || !dataInicio || !dataFim}
                 >
-                {isLoadingCSV ? 
-                    <ActivityIndicator size="small" color="#FFFFFF" /> : 
-                    <MaterialCommunityIcons name="file-delimited-outline" size={28} color="#FFFFFF" />
-                }
-                <Text style={styles.actionButtonText}>Exportar para CSV</Text>
-                </TouchableOpacity>
-
-                <TouchableOpacity 
-                    style={[styles.actionButton, styles.pdfButton, (isLoadingPDF || isLoadingCSV || isLoadingXLSX) && {opacity: 0.5}]} 
-                    onPress={handleGerarESalvarPDF} 
-                    disabled={isLoadingPDF || isLoadingCSV || isLoadingXLSX}
-                >
-                {isLoadingPDF ? 
-                    <ActivityIndicator size="small" color="#FFFFFF" /> : 
-                    <MaterialCommunityIcons name="file-pdf-box" size={28} color="#FFFFFF" />
-                }
+                {isLoadingPDF ? <ActivityIndicator size="small" color="#FFFFFF" /> : <MaterialCommunityIcons name="file-pdf-box" size={28} color="#FFFFFF" />}
                 <Text style={styles.actionButtonText}>Exportar Relatório PDF</Text>
                 </TouchableOpacity>
             </View>
@@ -363,8 +295,28 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#E0E0FF',
     textAlign: 'center',
-    marginBottom: 30,
+    marginBottom: 20,
     lineHeight: 24,
+  },
+  datePickerContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    width: '100%',
+    marginBottom: 20,
+  },
+  datePickerButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255, 255, 255, 0.15)',
+    paddingVertical: 12,
+    paddingHorizontal: 15,
+    borderRadius: 8,
+    width: '48%',
+  },
+  datePickerText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    marginLeft: 10,
   },
   actionButton: {
     flexDirection: 'row',
@@ -381,9 +333,6 @@ const styles = StyleSheet.create({
   xlsxButton: {
     backgroundColor: '#1D6F42',
   },
-  csvButton: {
-    backgroundColor: 'rgba(0, 100, 150, 0.8)',
-  },
   pdfButton: {
     backgroundColor: 'rgba(211, 47, 47, 0.8)',
   },
@@ -392,5 +341,8 @@ const styles = StyleSheet.create({
     fontSize: 17,
     fontWeight: 'bold',
     marginLeft: 15,
+  },
+  disabledButton: {
+      opacity: 0.5,
   },
 });

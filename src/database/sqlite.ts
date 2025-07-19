@@ -178,6 +178,29 @@ export const listarVendaPorIdSQLite = async (idVenda: string): Promise<Venda | n
     return venda;
 };
 
+// ✨ NOVA FUNÇÃO ADICIONADA PARA O RELATÓRIO
+export const listarVendasPorPeriodoSQLite = async (dataInicio: string, dataFim: string): Promise<Venda[]> => {
+    const vendas = await db.getAllAsync<Venda>(
+        'SELECT * FROM vendas WHERE dataVenda >= ? AND dataVenda <= ? ORDER BY dataVenda DESC',
+        dataInicio,
+        dataFim
+    );
+
+    if (vendas.length === 0) return [];
+    
+    const vendaIds = vendas.map(v => v.id);
+    const placeholders = vendaIds.map(() => '?').join(',');
+
+    const todosItens = await db.getAllAsync<ItemVenda>(`SELECT * FROM itens_venda WHERE idVenda IN (${placeholders})`, ...vendaIds);
+    const todosPagamentos = await db.getAllAsync<Pagamento>(`SELECT * FROM pagamentos WHERE idVenda IN (${placeholders})`, ...vendaIds);
+
+    return vendas.map(venda => ({
+        ...venda,
+        itens: todosItens.filter(item => item.idVenda && item.idVenda === venda.id),
+        pagamentos: todosPagamentos.filter(pagamento => pagamento.idVenda && pagamento.idVenda === venda.id)
+    }));
+};
+
 export const excluirVendaSQLite = async (idVenda: string) => await db.runAsync('DELETE FROM vendas WHERE id = ?;', idVenda);
 
 export const registrarPagamentoSQLite = async (idVenda: string, valor: number, dataPagamento: string) => {
