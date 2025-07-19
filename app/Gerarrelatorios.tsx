@@ -4,14 +4,15 @@ import { useRouter } from 'expo-router';
 import * as Print from 'expo-print';
 import * as Sharing from 'expo-sharing';
 import * as FileSystem from 'expo-file-system';
+import * as XLSX from 'xlsx';
 import { Venda } from '../src/types';
-// ✨ SUBSTITUÍDO: Importamos apenas a função que busca TODAS as vendas de uma só vez.
 import { listarTodasVendasSQLite } from '../src/database/sqlite';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 
 export default function GerarRelatoriosScreen() {
   const [isLoadingPDF, setIsLoadingPDF] = useState(false);
   const [isLoadingCSV, setIsLoadingCSV] = useState(false);
+  const [isLoadingXLSX, setIsLoadingXLSX] = useState(false);
   const router = useRouter();
 
   const calcularValorPagoVenda = (venda: Venda): number => {
@@ -48,18 +49,11 @@ export default function GerarRelatoriosScreen() {
     let valorTotalGeralPago = 0;
     
     try {
-      // ✨ OTIMIZAÇÃO: Buscamos TODAS as vendas e seus detalhes de uma única vez.
       const todasAsVendas = await listarTodasVendasSQLite();
-
-      // Agrupamos as vendas por cliente em memória, o que é muito rápido.
       const vendasPorCliente = todasAsVendas.reduce((acc, venda) => {
         const id = venda.idCliente;
         if (!acc[id]) {
-          acc[id] = {
-            clienteNome: venda.clienteNome,
-            clienteTelefone: venda.clienteTelefone,
-            vendas: []
-          };
+          acc[id] = { clienteNome: venda.clienteNome, clienteTelefone: venda.clienteTelefone, vendas: [] };
         }
         acc[id].vendas.push(venda);
         return acc;
@@ -68,28 +62,22 @@ export default function GerarRelatoriosScreen() {
       const clientesComVendasCount = Object.keys(vendasPorCliente).length;
       htmlContent += `<h2>Clientes e Suas Vendas</h2>`;
 
-      // Agora, iteramos sobre os dados já agrupados, sem novas buscas ao banco.
       for (const idCliente in vendasPorCliente) {
         const dadosCliente = vendasPorCliente[idCliente];
-        
-        htmlContent += `<div class="cliente-bloco">`;
-        htmlContent += `<h3>Cliente: ${dadosCliente.clienteNome}</h3>`;
+        htmlContent += `<div class="cliente-bloco"><h3>Cliente: ${dadosCliente.clienteNome}</h3>`;
         if (dadosCliente.clienteTelefone) htmlContent += `<p>Telefone: ${dadosCliente.clienteTelefone}</p>`;
         
         let subtotalVendidoCliente = 0;
         let subtotalPagoCliente = 0;
 
         htmlContent += `<table><thead><tr><th>Data</th><th>Itens da Venda</th><th class="text-right">Valor Venda</th><th class="text-right">Pago</th><th class="text-right">Pendente</th></tr></thead><tbody>`;
-        
         for (const venda of dadosCliente.vendas) {
             const valorPagoVenda = calcularValorPagoVenda(venda);
             const saldoDevedorVenda = venda.valorTotal - valorPagoVenda;
-            
             subtotalVendidoCliente += venda.valorTotal;
             subtotalPagoCliente += valorPagoVenda;
             valorTotalGeralVendido += venda.valorTotal;
             valorTotalGeralPago += valorPagoVenda;
-
             const itensHtml = venda.itens?.map(p => `${p.quantidade}x ${p.descricao}`).join('<br>') || 'N/A';
 
             htmlContent += `
@@ -118,7 +106,6 @@ export default function GerarRelatoriosScreen() {
       `;
       const h1EndIndex = htmlContent.indexOf('</h1>') + 5;
       htmlContent = htmlContent.slice(0, h1EndIndex) + resumoGeralHtml + htmlContent.slice(h1EndIndex);
-
     } catch (error) {
       console.error("Erro ao gerar dados para HTML:", error);
       htmlContent += `<p style="color:red;">Erro ao carregar todos os dados para o relatório PDF.</p>`;
@@ -152,15 +139,13 @@ export default function GerarRelatoriosScreen() {
     }
   };
 
+  // --- Lógica para CSV ---
   const gerarConteudoCSV = async (): Promise<string> => {
-    let csvString = "ID Cliente,Nome Cliente,Telefone Cliente,ID Venda,Data Venda,Itens da Venda,Valor Total Venda,Valor Pago Venda,Saldo Devedor Venda\n";
+    let csvString = "ID Cliente,Nome Cliente,Telefone Cliente,ID Venda,Data Venda,Itens da Venda,Subtotal,Desconto,Valor Total Venda,Valor Pago Venda,Saldo Devedor Venda\n";
     let valorTotalGeralVendidoCSV = 0;
     let valorTotalGeralPagoCSV = 0;
     try {
-      // ✨ OTIMIZAÇÃO: Mesma estratégia, busca todas as vendas de uma vez.
       const todasAsVendas = await listarTodasVendasSQLite();
-
-      // Para CSV, nem precisamos agrupar. Apenas iteramos sobre a lista completa.
       for (const venda of todasAsVendas) {
         const valorPagoVenda = calcularValorPagoVenda(venda);
         const saldoDevedorVenda = venda.valorTotal - valorPagoVenda;
@@ -174,18 +159,19 @@ export default function GerarRelatoriosScreen() {
         const idVendaCsv = `"${venda.id}"`;
         const dataVendaCsv = `"${new Date(venda.dataVenda).toLocaleDateString('pt-BR')}"`;
         const produtoCsv = `"${itensCsv.replace(/"/g, '""')}"`;
+        const subtotalCsv = venda.subtotal.toFixed(2);
+        const descontoCsv = (venda.desconto || 0).toFixed(2);
         const valorTotalCsv = venda.valorTotal.toFixed(2);
         const valorPagoCsv = valorPagoVenda.toFixed(2);
         const saldoDevedorCsv = saldoDevedorVenda.toFixed(2);
 
-        csvString += `${idClienteCsv},${nomeClienteCsv},${telefoneClienteCsv},${idVendaCsv},${dataVendaCsv},${produtoCsv},${valorTotalCsv},${valorPagoCsv},${saldoDevedorCsv}\n`;
+        csvString += `${idClienteCsv},${nomeClienteCsv},${telefoneClienteCsv},${idVendaCsv},${dataVendaCsv},${produtoCsv},${subtotalCsv},${descontoCsv},${valorTotalCsv},${valorPagoCsv},${saldoDevedorCsv}\n`;
       }
       
       csvString += "\n"; 
-      csvString += `TOTAL GERAL VENDIDO (LÍQUIDO):,,,,,,${valorTotalGeralVendidoCSV.toFixed(2)}\n`;
-      csvString += `TOTAL GERAL RECEBIDO:,,,,,,,${valorTotalGeralPagoCSV.toFixed(2)}\n`;
-      csvString += `TOTAL GERAL PENDENTE:,,,,,,,,${(valorTotalGeralVendidoCSV - valorTotalGeralPagoCSV).toFixed(2)}\n`;
-
+      csvString += `TOTAL GERAL VENDIDO (LÍQUIDO):,,,,,,,,${valorTotalGeralVendidoCSV.toFixed(2)}\n`;
+      csvString += `TOTAL GERAL RECEBIDO:,,,,,,,,,${valorTotalGeralPagoCSV.toFixed(2)}\n`;
+      csvString += `TOTAL GERAL PENDENTE:,,,,,,,,,,${(valorTotalGeralVendidoCSV - valorTotalGeralPagoCSV).toFixed(2)}\n`;
     } catch (error) {
       console.error("Erro ao gerar dados para CSV:", error);
       return "ERRO_AO_GERAR_DADOS_CSV"; 
@@ -219,6 +205,69 @@ export default function GerarRelatoriosScreen() {
     }
   };
 
+  const handleGerarESalvarXLSX = async () => {
+    setIsLoadingXLSX(true);
+    try {
+        const todasAsVendas = await listarTodasVendasSQLite();
+        if (todasAsVendas.length === 0) {
+            Alert.alert("Atenção", "Nenhuma venda encontrada para gerar o relatório.");
+            return;
+        }
+
+        const dadosParaPlanilha = todasAsVendas.map(venda => {
+            const valorPago = calcularValorPagoVenda(venda);
+            return {
+                'Nome do Cliente': venda.clienteNome,
+                'Telefone': venda.clienteTelefone,
+                'Data da Venda': new Date(venda.dataVenda).toLocaleDateString('pt-BR'),
+                'Itens': venda.itens?.map(p => `${p.quantidade}x ${p.descricao}`).join('; '),
+                'Subtotal': venda.subtotal,
+                'Desconto': venda.desconto || 0,
+                'Valor Total': venda.valorTotal,
+                'Valor Pago': valorPago,
+                'Saldo Devedor': venda.valorTotal - valorPago,
+                'Status': (venda.valorTotal - valorPago) <= 0.001 ? 'Quitada' : 'Pendente'
+            };
+        });
+
+        const worksheet = XLSX.utils.json_to_sheet(dadosParaPlanilha);
+        const workbook = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(workbook, worksheet, "Relatório de Vendas");
+
+        worksheet['!cols'] = [
+            { wch: 25 }, { wch: 15 }, { wch: 12 }, { wch: 40 },
+            { wch: 10 }, { wch: 10 }, { wch: 10 }, { wch: 10 },
+            { wch: 12 }, { wch: 10 },
+        ];
+
+        const wbout = XLSX.write(workbook, { type: 'base64', bookType: 'xlsx' });
+        
+        const fileName = `RelatorioVendas_CVSApp_${new Date().toISOString().split('T')[0]}.xlsx`;
+        const fileUri = (FileSystem.cacheDirectory || FileSystem.documentDirectory) + fileName;
+        
+        await FileSystem.writeAsStringAsync(fileUri, wbout, {
+            encoding: FileSystem.EncodingType.Base64
+        });
+
+        if (!(await Sharing.isAvailableAsync())) {
+            Alert.alert('Erro', 'O compartilhamento não está disponível neste dispositivo.');
+            return;
+        }
+        
+        await Sharing.shareAsync(fileUri, {
+            mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            dialogTitle: 'Compartilhar Relatório Excel',
+            UTI: 'com.microsoft.excel.xlsx'
+        });
+
+    } catch (error) {
+        console.error("Erro ao gerar relatório XLSX:", error);
+        Alert.alert("Erro", "Não foi possível gerar o relatório em Excel.");
+    } finally {
+        setIsLoadingXLSX(false);
+    }
+  };
+
   return (
     <ImageBackground source={require('../assets/images/fundo.jpg')} style={styles.background} blurRadius={2}>
       <View style={styles.overlay} />
@@ -237,27 +286,39 @@ export default function GerarRelatoriosScreen() {
                 </Text>
 
                 <TouchableOpacity 
-                    style={[styles.actionButton, styles.pdfButton, (isLoadingPDF || isLoadingCSV) && {opacity: 0.5}]} 
+                    style={[styles.actionButton, styles.xlsxButton, (isLoadingPDF || isLoadingCSV || isLoadingXLSX) && {opacity: 0.5}]}
+                    onPress={handleGerarESalvarXLSX} 
+                    disabled={isLoadingPDF || isLoadingCSV || isLoadingXLSX}
+                >
+                    {isLoadingXLSX ? 
+                        <ActivityIndicator size="small" color="#FFFFFF" /> : 
+                        <MaterialCommunityIcons name="microsoft-excel" size={28} color="#FFFFFF" />
+                    }
+                    <Text style={styles.actionButtonText}>Exportar para Excel (.xlsx)</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity 
+                    style={[styles.actionButton, styles.csvButton, (isLoadingPDF || isLoadingCSV || isLoadingXLSX) && {opacity: 0.5}]}
+                    onPress={handleGerarESalvarCSV} 
+                    disabled={isLoadingPDF || isLoadingCSV || isLoadingXLSX}
+                >
+                {isLoadingCSV ? 
+                    <ActivityIndicator size="small" color="#FFFFFF" /> : 
+                    <MaterialCommunityIcons name="file-delimited-outline" size={28} color="#FFFFFF" />
+                }
+                <Text style={styles.actionButtonText}>Exportar para CSV</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity 
+                    style={[styles.actionButton, styles.pdfButton, (isLoadingPDF || isLoadingCSV || isLoadingXLSX) && {opacity: 0.5}]} 
                     onPress={handleGerarESalvarPDF} 
-                    disabled={isLoadingPDF || isLoadingCSV}
+                    disabled={isLoadingPDF || isLoadingCSV || isLoadingXLSX}
                 >
                 {isLoadingPDF ? 
                     <ActivityIndicator size="small" color="#FFFFFF" /> : 
                     <MaterialCommunityIcons name="file-pdf-box" size={28} color="#FFFFFF" />
                 }
                 <Text style={styles.actionButtonText}>Exportar Relatório PDF</Text>
-                </TouchableOpacity>
-
-                <TouchableOpacity 
-                    style={[styles.actionButton, styles.csvButton, (isLoadingPDF || isLoadingCSV) && {opacity: 0.5}]} 
-                    onPress={handleGerarESalvarCSV} 
-                    disabled={isLoadingPDF || isLoadingCSV}
-                >
-                {isLoadingCSV ? 
-                    <ActivityIndicator size="small" color="#FFFFFF" /> : 
-                    <MaterialCommunityIcons name="file-excel-outline" size={28} color="#FFFFFF" />
-                }
-                <Text style={styles.actionButtonText}>Exportar para Excel (CSV)</Text>
                 </TouchableOpacity>
             </View>
         </ScrollView>
@@ -317,11 +378,14 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(255,255,255,0.2)',
     elevation: 4,
   },
-  pdfButton: {
-    backgroundColor: 'rgba(211, 47, 47, 0.8)', // Vermelho para PDF
+  xlsxButton: {
+    backgroundColor: '#1D6F42',
   },
   csvButton: {
-    backgroundColor: 'rgba(27, 94, 32, 0.8)', // Verde escuro para CSV/Excel
+    backgroundColor: 'rgba(0, 100, 150, 0.8)',
+  },
+  pdfButton: {
+    backgroundColor: 'rgba(211, 47, 47, 0.8)',
   },
   actionButtonText: {
     color: 'white',

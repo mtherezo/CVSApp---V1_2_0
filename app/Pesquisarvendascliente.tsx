@@ -118,7 +118,7 @@ export default function PesquisarVendasClienteScreen() {
                     <MaterialCommunityIcons name="magnify" size={22} color="#A9A9A9" style={styles.inputIcon} />
                     <TextInput
                         style={styles.input}
-                        placeholder="Digite o nome do cliente..."
+                        placeholder="Nome do cliente..."
                         value={termoPesquisa}
                         onChangeText={setTermoPesquisa}
                         placeholderTextColor="#A9A9A9"

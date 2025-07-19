@@ -12,19 +12,19 @@ import {
   Platform,
   SafeAreaView,
   FlatList,
+  StatusBar,
+  KeyboardAvoidingView,
 } from 'react-native';
 import { useLocalSearchParams, useRouter, useFocusEffect } from 'expo-router';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-// ✨ SUBSTITUÍDO: Importa as funções do SQLite. Note a adição da função de ATUALIZAR.
 import {
   listarVendaPorIdSQLite,
   registrarPagamentoSQLite,
   excluirPagamentoSQLite,
-  atualizarVendaSQLite, // Importante para manter a contagem de parcelas
+  atualizarVendaSQLite,
 } from '../src/database/sqlite';
 import { Pagamento, Venda } from '../src/types';
 
-// Componente Memoizado não precisa de alterações.
 const MemoizedPagamentoItem = React.memo(({ item, onExcluir, isDeleting, isSubmitting }: { item: Pagamento, onExcluir: (item: Pagamento) => void, isDeleting: boolean, isSubmitting: boolean }) => (
     <View style={styles.itemPagamento}>
       <View style={styles.itemPagamentoInfo}>
@@ -36,13 +36,59 @@ const MemoizedPagamentoItem = React.memo(({ item, onExcluir, isDeleting, isSubmi
         onPress={() => onExcluir(item)}
         disabled={isDeleting || isSubmitting}
       >
-        {isDeleting ?
-            <ActivityIndicator size="small" color="#FFFFFF"/> :
-            <MaterialCommunityIcons name="trash-can-outline" size={22} color="#FF6B6B" />
-        }
+        {isDeleting ? <ActivityIndicator size="small" color="#FFFFFF"/> : <MaterialCommunityIcons name="trash-can-outline" size={22} color="#FF6B6B" />}
       </TouchableOpacity>
     </View>
 ));
+
+const FormularioNovoPagamento = ({ saldoDevedor, onRegistrarPagamento, isSubmitting }: {
+  saldoDevedor: number;
+  onRegistrarPagamento: (valor: string) => void;
+  isSubmitting: boolean;
+}) => {
+  const [valorPagamento, setValorPagamento] = useState('');
+
+  const handlePress = () => {
+    const valorNum = parseFloat(valorPagamento.replace(',', '.'));
+    if (isNaN(valorNum) || valorNum <= 0) {
+      Alert.alert("Valor Inválido", "Por favor, digite um valor de pagamento válido e positivo.");
+      return;
+    }
+    onRegistrarPagamento(valorPagamento);
+    setValorPagamento('');
+  };
+
+  return (
+    <View style={styles.novoPagamentoContainer}>
+      <Text style={styles.sectionTitle}>Registrar Novo Pagamento</Text>
+      <View style={styles.inputContainer}>
+        <MaterialCommunityIcons name="currency-brl" size={22} color="#A9A9A9" style={styles.inputIcon} />
+        <TextInput
+          style={styles.input}
+          placeholder={`Valor (Pendente: R$ ${saldoDevedor.toFixed(2)})`}
+          keyboardType="decimal-pad"
+          value={valorPagamento}
+          onChangeText={setValorPagamento}
+          placeholderTextColor="#A9A9A9"
+          editable={!isSubmitting}
+        />
+      </View>
+      <TouchableOpacity 
+          style={[styles.botaoRegistrar, (isSubmitting || !valorPagamento) && styles.botaoDesabilitado]} 
+          onPress={handlePress}
+          disabled={isSubmitting || !valorPagamento}
+      >
+        {isSubmitting ? 
+          <ActivityIndicator size="small" color="#FFFFFF" /> :
+          <>
+            <MaterialCommunityIcons name="content-save-check-outline" size={22} color="#FFFFFF" />
+            <Text style={styles.textoBotaoPrincipal}>Registrar</Text>
+          </>
+        }
+      </TouchableOpacity>
+    </View>
+  );
+};
 
 export default function ParcelasVendaClienteScreen() {
   const params = useLocalSearchParams<{ idVenda?: string }>();
@@ -51,13 +97,12 @@ export default function ParcelasVendaClienteScreen() {
   
   const [vendaAtual, setVendaAtual] = useState<Venda | null>(null);
   const [pagamentos, setPagamentos] = useState<Pagamento[]>([]);
-  const [valorPagamento, setValorPagamento] = useState('');
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmittingPagamento, setIsSubmittingPagamento] = useState(false);
   const [isDeletingPagamento, setIsDeletingPagamento] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
 
-  const carregarDadosVendaEPagamentos = async (showMainLoader = true) => {
+  const carregarDadosVendaEPagamentos = useCallback(async (showMainLoader = true) => {
     if (!idVenda) {
       Alert.alert("Erro", "ID da Venda não fornecido.");
       router.canGoBack() ? router.back() : router.replace('/Home');
@@ -65,7 +110,6 @@ export default function ParcelasVendaClienteScreen() {
     }
     if (showMainLoader) setIsLoading(true);
       try {
-        // ✨ OTIMIZAÇÃO: Apenas UMA chamada ao banco que já traz a venda e seus pagamentos!
         const dadosVenda = await listarVendaPorIdSQLite(idVenda); 
         if (!dadosVenda) {
           Alert.alert("Erro", "Venda não encontrada.");
@@ -80,37 +124,44 @@ export default function ParcelasVendaClienteScreen() {
     } finally {
       if (showMainLoader) setIsLoading(false);
     }
-  };
+  }, [idVenda]);
 
-  const onRefresh = useCallback(async () => { setRefreshing(true); await carregarDadosVendaEPagamentos(false); setRefreshing(false); }, [idVenda]);
-  useFocusEffect( useCallback(() => { if (idVenda) { carregarDadosVendaEPagamentos(); } }, [idVenda]) );
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    await carregarDadosVendaEPagamentos(false);
+    setRefreshing(false);
+  }, [carregarDadosVendaEPagamentos]);
   
-  const handleRegistrarPagamento = async () => {
+  useFocusEffect(
+    useCallback(() => {
+      if (idVenda) {
+        carregarDadosVendaEPagamentos();
+      }
+    }, [idVenda, carregarDadosVendaEPagamentos])
+  );
+  
+  const handleRegistrarPagamento = useCallback(async (valorString: string) => {
     if (!idVenda || !vendaAtual) return;
-    const valor = parseFloat(valorPagamento.replace(',', '.'));
-    if (isNaN(valor) || valor <= 0) {
-      Alert.alert("Valor Inválido", "Por favor, digite um valor de pagamento válido e positivo.");
-      return;
-    }
+    const valor = parseFloat(valorString.replace(',', '.'));
+    if (isNaN(valor) || valor <= 0) return;
+    
     setIsSubmittingPagamento(true);
     try {
-      // ✨ MUDANÇA: Chama a função do SQLite, passando a data atual.
       await registrarPagamentoSQLite(idVenda, valor, new Date().toISOString());
       
-      // ✨ LÓGICA ADICIONAL: Se a venda for parcelada, atualiza a contagem de parcelas pagas.
       if (vendaAtual.tipoPagamento === 'Parcelado') {
         const novasParcelasPagas = (vendaAtual.parcelasPagas || 0) + 1;
         await atualizarVendaSQLite({ id: idVenda, parcelasPagas: novasParcelasPagas });
       }
-
-      Alert.alert("Sucesso", "Pagamento registrado com sucesso!");
-      setValorPagamento(''); 
+      
       await carregarDadosVendaEPagamentos(false); 
     } catch (error) {
       console.error('Falha ao registrar pagamento (catch na tela):', error);
       Alert.alert('Erro Inesperado', 'Ocorreu um erro ao tentar registrar o pagamento.');
-    } finally { setIsSubmittingPagamento(false); }
-  };
+    } finally { 
+      setIsSubmittingPagamento(false);
+    }
+  }, [idVenda, vendaAtual, carregarDadosVendaEPagamentos]);
   
   const confirmarExclusaoPagamento = useCallback((pagamentoParaExcluir: Pagamento) => {
     if (!idVenda || !vendaAtual) return;
@@ -119,16 +170,13 @@ export default function ParcelasVendaClienteScreen() {
       { text: 'Excluir Definitivamente', style: 'destructive', onPress: async () => {
         setIsDeletingPagamento(pagamentoParaExcluir.id);
         try {
-          // ✨ MUDANÇA: Chama a função do SQLite (só precisa do ID do pagamento).
           await excluirPagamentoSQLite(pagamentoParaExcluir.id);
-
-          // ✨ LÓGICA ADICIONAL: Se a venda for parcelada, decrementa a contagem de parcelas pagas.
+          
           if (vendaAtual.tipoPagamento === 'Parcelado' && (vendaAtual.parcelasPagas || 0) > 0) {
             const novasParcelasPagas = (vendaAtual.parcelasPagas || 0) - 1;
             await atualizarVendaSQLite({ id: idVenda, parcelasPagas: novasParcelasPagas });
           }
-
-          Alert.alert('Sucesso', 'Pagamento excluído.');
+          
           await carregarDadosVendaEPagamentos(false);
         } catch (error) {
           console.error('Falha ao excluir pagamento (catch na tela):', error);
@@ -136,19 +184,13 @@ export default function ParcelasVendaClienteScreen() {
         } finally { setIsDeletingPagamento(null); }
       }},
     ]);
-  }, [idVenda, vendaAtual]); // Adiciona vendaAtual às dependências
+  }, [idVenda, vendaAtual, carregarDadosVendaEPagamentos]);
 
   const totalPago = pagamentos.reduce((acc, p) => acc + p.valorPago, 0);
   const saldoDevedor = vendaAtual ? vendaAtual.valorTotal - totalPago : 0;
 
   const renderHeader = () => (
     <>
-      <View style={styles.headerContainer}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-            <MaterialCommunityIcons name="arrow-left" size={24} color="#FFFFFF" />
-        </TouchableOpacity>
-        <Text style={styles.title}>Pagamentos da Venda</Text>
-      </View>
       {vendaAtual && (
         <View style={styles.resumoVendaContainer}>
           <Text style={styles.resumoVendaTexto}>Cliente: {vendaAtual.clienteNome}</Text>
@@ -165,41 +207,6 @@ export default function ParcelasVendaClienteScreen() {
         </View>
       )}
       <Text style={styles.sectionTitle}>Histórico de Pagamentos</Text>
-    </>
-  );
-  
-  const renderFooter = () => (
-    <>
-      {saldoDevedor > 0.001 && ( 
-        <View style={styles.novoPagamentoContainer}>
-          <Text style={styles.sectionTitle}>Registrar Novo Pagamento</Text>
-          <View style={styles.inputContainer}>
-            <MaterialCommunityIcons name="currency-brl" size={22} color="#A9A9A9" style={styles.inputIcon} />
-            <TextInput
-              style={styles.input}
-              placeholder={`Valor (Max: R$ ${saldoDevedor.toFixed(2)})`}
-              keyboardType="decimal-pad"
-              value={valorPagamento}
-              onChangeText={setValorPagamento}
-              placeholderTextColor="#A9A9A9"
-              editable={!isSubmittingPagamento}
-            />
-          </View>
-          <TouchableOpacity 
-              style={[styles.botaoRegistrar, (isSubmittingPagamento || !valorPagamento) && styles.botaoDesabilitado]} 
-              onPress={handleRegistrarPagamento}
-              disabled={isSubmittingPagamento || !valorPagamento}
-          >
-            {isSubmittingPagamento ? 
-              <ActivityIndicator size="small" color="#FFFFFF" /> :
-              <>
-                <MaterialCommunityIcons name="content-save-check-outline" size={22} color="#FFFFFF" />
-                <Text style={styles.textoBotaoPrincipal}>Registrar</Text>
-              </>
-            }
-          </TouchableOpacity>
-        </View>
-      )}
     </>
   );
 
@@ -219,24 +226,45 @@ export default function ParcelasVendaClienteScreen() {
     <ImageBackground source={require("../assets/images/fundo.jpg")} style={styles.background} blurRadius={2}>
       <View style={styles.overlay} />
       <SafeAreaView style={styles.safeArea}>
-        <FlatList
-          data={pagamentos}
-          keyExtractor={(item) => item.id}
-          renderItem={({ item }) => (
-            <MemoizedPagamentoItem 
-              item={item}
-              onExcluir={confirmarExclusaoPagamento}
-              isDeleting={isDeletingPagamento === item.id}
+        <View style={styles.headerContainer}>
+          <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
+              <MaterialCommunityIcons name="arrow-left" size={24} color="#FFFFFF" />
+          </TouchableOpacity>
+          <Text style={styles.title}>Pagamentos da Venda</Text>
+        </View>
+
+        <KeyboardAvoidingView
+          style={styles.keyboardAvoidingContainer}
+          behavior={Platform.OS === "ios" ? "padding" : "height"}
+          keyboardVerticalOffset={Platform.OS === 'ios' ? 60 : 0}
+        >
+          <FlatList
+            data={pagamentos}
+            style={{flex: 1}}
+            contentContainerStyle={styles.scrollContainer}
+            keyExtractor={(item) => item.id}
+            renderItem={({ item }) => (
+              <MemoizedPagamentoItem 
+                item={item}
+                onExcluir={confirmarExclusaoPagamento}
+                isDeleting={isDeletingPagamento === item.id}
+                isSubmitting={isSubmittingPagamento}
+              />
+            )}
+            ListHeaderComponent={renderHeader}
+            ListEmptyComponent={<Text style={styles.listaVaziaTexto}>Nenhum pagamento registrado.</Text>}
+            refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#FFFFFF" />}
+            keyboardShouldPersistTaps="handled"
+          />
+          
+          {saldoDevedor > 0.001 && ( 
+            <FormularioNovoPagamento
+              saldoDevedor={saldoDevedor}
+              onRegistrarPagamento={handleRegistrarPagamento}
               isSubmitting={isSubmittingPagamento}
             />
           )}
-          ListHeaderComponent={renderHeader}
-          ListFooterComponent={renderFooter}
-          ListEmptyComponent={<Text style={styles.listaVaziaTexto}>Nenhum pagamento registrado.</Text>}
-          contentContainerStyle={styles.scrollContainer}
-          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#FFFFFF" />}
-          keyboardShouldPersistTaps="handled"
-        />
+        </KeyboardAvoidingView>
       </SafeAreaView>
     </ImageBackground>
   );
@@ -245,14 +273,15 @@ export default function ParcelasVendaClienteScreen() {
 const styles = StyleSheet.create({
   background: { flex: 1 },
   overlay: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(25, 10, 50, 0.75)' },
-  safeArea: { flex: 1, paddingTop: Platform.OS === 'android' ? 10 : 0 },
-  scrollContainer: { flexGrow: 1, paddingHorizontal: 16, paddingBottom: 40 },
+  safeArea: { flex: 1, paddingTop: Platform.OS === 'android' ? StatusBar.currentHeight : 0 },
+  keyboardAvoidingContainer: { flex: 1 },
+  scrollContainer: { flexGrow: 1, paddingHorizontal: 16, paddingBottom: 10 },
   loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
   loadingText: { marginTop: 10, color: '#FFFFFF', fontSize: 16 },
-  headerContainer: { flexDirection: 'row', alignItems: 'center', paddingVertical: 10, marginBottom: 10 },
-  backButton: { padding: 8, marginRight: 10 },
+  headerContainer: { flexDirection: 'row', alignItems: 'center', paddingVertical: 10, paddingHorizontal: 16, marginBottom: 10 },
+  backButton: { padding: 8, marginRight: 10, marginLeft: -8 },
   title: { fontSize: 26, fontWeight: 'bold', color: '#FFFFFF', textAlign: 'center', flex: 1, marginRight: 48 },
-  sectionTitle: { fontSize: 20, fontWeight: '600', marginTop: 20, marginBottom: 15, color: '#FFFFFF' },
+  sectionTitle: { fontSize: 20, fontWeight: '600', marginTop: 10, marginBottom: 15, color: '#FFFFFF' },
   resumoVendaContainer: {
     backgroundColor: 'rgba(255, 255, 255, 0.1)', 
     padding: 18,
@@ -282,10 +311,12 @@ const styles = StyleSheet.create({
   itemData: { fontSize: 13, color: '#E0E0FF', marginTop: 4, fontStyle: 'italic' },
   botaoExcluirItem: { padding: 8, marginLeft: 10 },
   novoPagamentoContainer: {
-    marginTop: 10, 
+    paddingHorizontal: 16,
     paddingTop: 15,
+    paddingBottom: Platform.OS === 'ios' ? 20 : 10, // Espaçamento extra no iOS
     borderTopWidth: 1,
-    borderTopColor: 'rgba(255,255,255,0.1)',
+    borderTopColor: 'rgba(255,255,255,0.2)',
+    backgroundColor: 'rgba(25, 10, 50, 0.85)'
   },
   inputContainer: { flexDirection: 'row', alignItems: 'center', backgroundColor: 'rgba(0, 0, 0, 0.25)', borderRadius: 12, borderWidth: 1, borderColor: 'rgba(255, 255, 255, 0.2)', marginBottom: 15 },
   inputIcon: { paddingLeft: 15, paddingRight: 10 },
