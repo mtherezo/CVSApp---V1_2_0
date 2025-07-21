@@ -22,7 +22,6 @@ import * as Crypto from 'expo-crypto';
 import DateTimePicker, { DateTimePickerEvent } from '@react-native-community/datetimepicker';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 
-// ✨ ALTERAÇÃO 1: O tipo do item recebido agora omite 'idVenda'.
 const MemoizedItemAdicionado = React.memo(({ item, onRemove }: { item: Omit<ItemVenda, 'idVenda'>, onRemove: (id: string) => void }) => {
     const subtotalItem = item.valor * item.quantidade;
     return (
@@ -42,7 +41,6 @@ export default function CadastroVendaScreen() {
   const router = useRouter();
   const { idCliente, nome: clienteNome } = useLocalSearchParams<{ idCliente?: string; nome?: string; }>();
 
-  // ✨ ALTERAÇÃO 2: O estado dos itens agora é uma lista de itens sem 'idVenda'.
   const [itens, setItens] = useState<Omit<ItemVenda, 'idVenda'>[]>([]);
   const [itemDescricao, setItemDescricao] = useState('');
   const [itemValor, setItemValor] = useState('');
@@ -50,8 +48,13 @@ export default function CadastroVendaScreen() {
   const [desconto, setDesconto] = useState('');
   const [tipoPagamento, setTipoPagamento] = useState<'À Vista' | 'Parcelado'>('À Vista');
   const [quantidadeParcelas, setQuantidadeParcelas] = useState('2');
+  
+  // ✨ States para a nova funcionalidade de data
+  const [dataVenda, setDataVenda] = useState(new Date());
+  const [showDatePickerVenda, setShowDatePickerVenda] = useState(false);
+  
   const [dataPrimeiraParcela, setDataPrimeiraParcela] = useState(new Date());
-  const [mostrarDataPicker, setMostrarDataPicker] = useState(false);
+  const [mostrarDataPickerParcela, setMostrarDataPickerParcela] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
 
   const subtotal = itens.reduce((total, item) => total + (item.valor * item.quantidade), 0);
@@ -65,7 +68,6 @@ export default function CadastroVendaScreen() {
       Alert.alert("Atenção", "Preencha a descrição, quantidade e um valor válido para o produto.");
       return;
     }
-    // ✨ ALTERAÇÃO 3: O novo item é criado sem 'idVenda', o que agora corresponde ao tipo.
     const novoItem: Omit<ItemVenda, 'idVenda'> = {
       id: Crypto.randomUUID(),
       descricao: itemDescricao.trim(),
@@ -108,7 +110,7 @@ export default function CadastroVendaScreen() {
       itens: itens,
       subtotal: subtotal,
       valorTotal: totalFinal,
-      dataVenda: new Date().toISOString(),
+      dataVenda: dataVenda.toISOString(), // ✨ Usa a data selecionada
       tipoPagamento,
       ...(valorDesconto > 0 && { desconto: valorDesconto }),
       ...(tipoPagamento === 'Parcelado' && {
@@ -130,8 +132,16 @@ export default function CadastroVendaScreen() {
     }
   };
   
-  const onChangeData = (event: DateTimePickerEvent, selectedDate?: Date) => {
-      setMostrarDataPicker(Platform.OS === 'ios');
+  // ✨ Funções para os seletores de data
+  const onChangeDataVenda = (event: DateTimePickerEvent, selectedDate?: Date) => {
+      setShowDatePickerVenda(Platform.OS === 'ios');
+      if (selectedDate) {
+          setDataVenda(selectedDate);
+      }
+  };
+
+  const onChangeDataParcela = (event: DateTimePickerEvent, selectedDate?: Date) => {
+      setMostrarDataPickerParcela(Platform.OS === 'ios');
       if (selectedDate) {
           setDataPrimeiraParcela(selectedDate);
       }
@@ -161,14 +171,8 @@ export default function CadastroVendaScreen() {
                       <TextInput placeholder="Descrição do Produto" value={itemDescricao} onChangeText={setItemDescricao} placeholderTextColor="#A9A9A9" style={styles.input} />
                   </View>
                   <View style={styles.inputRow}>
-                      <View style={[styles.inputContainer, {flex:1}]}>
-                          <MaterialCommunityIcons name="counter" size={22} color="#A9A9A9" style={styles.inputIcon} />
-                          <TextInput placeholder="Qtde." value={itemQuantidade} onChangeText={setItemQuantidade} keyboardType="number-pad" placeholderTextColor="#A9A9A9" style={styles.input} />
-                      </View>
-                      <View style={[styles.inputContainer, {flex:2}]}>
-                          <MaterialCommunityIcons name="cash" size={22} color="#A9A9A9" style={styles.inputIcon} />
-                          <TextInput placeholder="Valor (un.)" value={itemValor} onChangeText={setItemValor} keyboardType="decimal-pad" placeholderTextColor="#A9A9A9" style={styles.input} />
-                      </View>
+                      <View style={[styles.inputContainer, {flex:1}]}><MaterialCommunityIcons name="counter" size={22} color="#A9A9A9" style={styles.inputIcon} /><TextInput placeholder="Qtde." value={itemQuantidade} onChangeText={setItemQuantidade} keyboardType="number-pad" placeholderTextColor="#A9A9A9" style={styles.input} /></View>
+                      <View style={[styles.inputContainer, {flex:2}]}><MaterialCommunityIcons name="cash" size={22} color="#A9A9A9" style={styles.inputIcon} /><TextInput placeholder="Valor (un.)" value={itemValor} onChangeText={setItemValor} keyboardType="decimal-pad" placeholderTextColor="#A9A9A9" style={styles.input} /></View>
                   </View>
                   <TouchableOpacity style={[styles.actionButton, styles.additemButton]} onPress={handleAdicionarItem}>
                       <MaterialCommunityIcons name="plus-circle-outline" size={22} color="#FFFFFF" />
@@ -178,6 +182,19 @@ export default function CadastroVendaScreen() {
 
               <View style={styles.sectionContainer}>
                   <Text style={styles.sectionTitle}>2. Resumo e Pagamento</Text>
+
+                  {/* ✨ Seletor de Data da Venda Adicionado */}
+                  <View style={styles.dateSelectorContainer}>
+                      <Text style={styles.dateSelectorLabel}>Data da Venda:</Text>
+                      <TouchableOpacity style={styles.datePickerButton} onPress={() => setShowDatePickerVenda(true)}>
+                          <MaterialCommunityIcons name="calendar" size={22} color="#A9A9A9" />
+                          <Text style={styles.datePickerText}>{dataVenda.toLocaleDateString('pt-BR')}</Text>
+                      </TouchableOpacity>
+                  </View>
+                  {showDatePickerVenda && (
+                      <DateTimePicker value={dataVenda} mode="date" display="default" onChange={onChangeDataVenda} />
+                  )}
+
                   {itens.length === 0 ? (
                       <Text style={styles.emptyListText}>Nenhum item adicionado ainda.</Text>
                   ) : (
@@ -191,7 +208,7 @@ export default function CadastroVendaScreen() {
                           <View style={styles.pagamentoSectionContainer}>
                               <Text style={styles.subSectionTitle}>Forma de Pagamento</Text>
                               <View style={styles.pagamentoContainer}><TouchableOpacity style={[styles.pagamentoBotao, tipoPagamento === 'À Vista' && styles.pagamentoSelecionado]} onPress={() => setTipoPagamento('À Vista')}><MaterialCommunityIcons name="cash" size={24} color={tipoPagamento === 'À Vista' ? "#FFF" : "#A9A9A9"} /><Text style={styles.textoBotaoPagamento}>À Vista</Text></TouchableOpacity><TouchableOpacity style={[styles.pagamentoBotao, tipoPagamento === 'Parcelado' && styles.pagamentoSelecionado]} onPress={() => setTipoPagamento('Parcelado')}><MaterialCommunityIcons name="credit-card-multiple-outline" size={24} color={tipoPagamento === 'Parcelado' ? "#FFF" : "#A9A9A9"} /><Text style={styles.textoBotaoPagamento}>Parcelado</Text></TouchableOpacity></View>
-                              {tipoPagamento === 'Parcelado' && (<View style={styles.parceladoContainer}><View style={[styles.inputContainer, {flex:1}]}><MaterialCommunityIcons name="format-list-numbered" size={22} color="#A9A9A9" style={styles.inputIcon} /><TextInput placeholder="Nº Parc." value={quantidadeParcelas} onChangeText={setQuantidadeParcelas} keyboardType="number-pad" style={styles.input} placeholderTextColor="#A9A9A9" /></View><TouchableOpacity style={[styles.inputContainer, {flex: 2, alignItems: 'center'}]} onPress={() => setMostrarDataPicker(true)}><MaterialCommunityIcons name="calendar-range" size={22} color="#A9A9A9" style={styles.inputIcon} /><Text style={styles.dateInputText}>{dataPrimeiraParcela.toLocaleDateString('pt-BR')}</Text></TouchableOpacity>{mostrarDataPicker && (<DateTimePicker value={dataPrimeiraParcela} mode="date" display="default" onChange={onChangeData} />)}</View>)}
+                              {tipoPagamento === 'Parcelado' && (<View style={styles.parceladoContainer}><View style={[styles.inputContainer, {flex:1}]}><MaterialCommunityIcons name="format-list-numbered" size={22} color="#A9A9A9" style={styles.inputIcon} /><TextInput placeholder="Nº Parc." value={quantidadeParcelas} onChangeText={setQuantidadeParcelas} keyboardType="number-pad" style={styles.input} placeholderTextColor="#A9A9A9" /></View><TouchableOpacity style={[styles.inputContainer, {flex: 2, alignItems: 'center'}]} onPress={() => setMostrarDataPickerParcela(true)}><MaterialCommunityIcons name="calendar-range" size={22} color="#A9A9A9" style={styles.inputIcon} /><Text style={styles.dateInputText}>{dataPrimeiraParcela.toLocaleDateString('pt-BR')}</Text></TouchableOpacity>{mostrarDataPickerParcela && (<DateTimePicker value={dataPrimeiraParcela} mode="date" display="default" onChange={onChangeDataParcela} />)}</View>)}
                           </View>
                       </>
                   )}
@@ -260,4 +277,35 @@ const styles = StyleSheet.create({
     saveButton: { backgroundColor: '#4CAF50' },
     loader: { marginVertical: 15 },
     disabledButton: { backgroundColor: '#555', opacity: 0.7 },
+    // ✨ NOVOS ESTILOS
+    dateSelectorContainer: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        marginBottom: 20,
+        paddingHorizontal: 5,
+        borderBottomWidth: 1,
+        borderBottomColor: 'rgba(255,255,255,0.2)',
+        paddingBottom: 20,
+    },
+    dateSelectorLabel: {
+        fontSize: 16,
+        color: '#E0E0FF',
+        fontWeight: '500',
+    },
+    datePickerButton: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: 'rgba(0, 0, 0, 0.25)',
+        borderRadius: 12,
+        paddingVertical: 10,
+        paddingHorizontal: 15,
+        borderWidth: 1,
+        borderColor: 'rgba(255, 255, 255, 0.2)',
+    },
+    datePickerText: {
+        color: '#FFFFFF',
+        fontSize: 16,
+        marginLeft: 10,
+    },
 });

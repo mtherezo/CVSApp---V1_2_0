@@ -19,6 +19,14 @@ export default function GerarRelatoriosScreen() {
   const [dataFim, setDataFim] = useState<Date | null>(null);
   const [showDatePicker, setShowDatePicker] = useState<'inicio' | 'fim' | null>(null);
 
+  // ✨ Função auxiliar compartilhada para formatar nomes de arquivo
+  const formatarDataParaNomeArquivo = (data: Date): string => {
+    const dia = String(data.getDate()).padStart(2, '0');
+    const mes = String(data.getMonth() + 1).padStart(2, '0'); // Mês começa em 0
+    const ano = data.getFullYear();
+    return `${dia}-${mes}-${ano}`;
+  };
+
   const calcularValorPagoVenda = (venda: Venda): number => {
     return venda.pagamentos?.reduce((acc, p) => acc + p.valorPago, 0) || 0;
   };
@@ -105,55 +113,36 @@ export default function GerarRelatoriosScreen() {
       `;
     
     return `
-      <html>
-        <head>
-          <meta charset="UTF-8">
-          <style>
-            body { font-family: Arial, sans-serif; margin: 20px; color: #333; } h1 { color: #6200EE; text-align: center; } h2 { color: #3700B3; border-bottom: 1px solid #ccc; padding-bottom: 5px; } h3 { color: #444; } table { width: 100%; border-collapse: collapse; margin-top: 15px; font-size: 0.9em; } th, td { border: 1px solid #ddd; padding: 6px; text-align: left; } th { background-color: #f2f2f2; } .resumo-geral { background-color: #e9e0ff; padding: 15px; border-radius: 8px; margin-bottom: 20px; } .cliente-bloco { page-break-inside: avoid; margin-bottom: 20px; } .text-right { text-align: right; } .total-geral {font-size: 1.1em;}
-          </style>
-        </head>
-        <body>
-          <h1>Relatório Consolidado de Vendas</h1>
-          ${resumoGeralHtml}
-          <h2>Detalhes por Cliente</h2>
-          ${corpoTabela}
-        </body>
-      </html>
+      <html><head><meta charset="UTF-8"><style>body{font-family:Arial,sans-serif;margin:20px;color:#333}h1{color:#6200EE;text-align:center}h2{color:#3700B3;border-bottom:1px solid #ccc;padding-bottom:5px}h3{color:#444}table{width:100%;border-collapse:collapse;margin-top:15px;font-size:.9em}th,td{border:1px solid #ddd;padding:6px;text-align:left}th{background-color:#f2f2f2}.resumo-geral{background-color:#e9e0ff;padding:15px;border-radius:8px;margin-bottom:20px}.cliente-bloco{page-break-inside:avoid;margin-bottom:20px}.text-right{text-align:right}.total-geral{font-size:1.1em}</style></head>
+      <body><h1>Relatório Consolidado de Vendas</h1>${resumoGeralHtml}<h2>Detalhes por Cliente</h2>${corpoTabela}</body></html>
     `;
   };
 
   const handleGerarPDF = async () => {
-    setIsLoadingPDF(true);
-    try {
-        const vendas = await fetchVendasDoPeriodo();
-        if (!vendas) {
-            setIsLoadingPDF(false); // Garante que o loading para se a função retornar
-            return;
-        }
+      setIsLoadingPDF(true);
+      try {
+          const vendas = await fetchVendasDoPeriodo();
+          if (!vendas) return;
 
-        const html = gerarConteudoHTML(vendas, dataInicio!, dataFim!);
-        const { uri: tempUri } = await Print.printToFileAsync({ html });
+          const html = gerarConteudoHTML(vendas, dataInicio!, dataFim!);
+          const { uri: tempUri } = await Print.printToFileAsync({ html });
+          
+          const dataInicioFormatada = formatarDataParaNomeArquivo(dataInicio!);
+          const dataFimFormatada = formatarDataParaNomeArquivo(dataFim!);
+          const novoNome = `RelatorioVendas_${dataInicioFormatada}_a_${dataFimFormatada}.pdf`;
+          
+          const novoUri = FileSystem.cacheDirectory + novoNome;
 
-        // ✨ CORREÇÃO: Define um novo nome e caminho para o arquivo
-        const novoNome = `Relatorio-Vendas-${dataInicio!.toISOString().split('T')[0]}.pdf`;
-        const novoUri = FileSystem.cacheDirectory + novoNome;
+          await FileSystem.moveAsync({ from: tempUri, to: novoUri });
 
-        // Move o arquivo temporário para o novo caminho com o nome correto
-        await FileSystem.moveAsync({
-            from: tempUri,
-            to: novoUri,
-        });
-
-        // Compartilha o arquivo a partir do novo caminho
-        await Sharing.shareAsync(novoUri, { mimeType: 'application/pdf', dialogTitle: 'Compartilhar Relatório PDF' });
-        
-    } catch (error) {
-        console.error("Erro ao gerar PDF:", error);
-        Alert.alert("Erro", "Não foi possível gerar o relatório PDF.");
-    } finally {
-        setIsLoadingPDF(false);
-    }
-};
+          await Sharing.shareAsync(novoUri, { mimeType: 'application/pdf', dialogTitle: 'Compartilhar Relatório PDF' });
+      } catch (error) {
+          console.error("Erro ao gerar PDF:", error);
+          Alert.alert("Erro", "Não foi possível gerar o relatório PDF.");
+      } finally {
+          setIsLoadingPDF(false);
+      }
+  };
 
   const handleGerarXLSX = async () => {
     setIsLoadingXLSX(true);
@@ -163,18 +152,20 @@ export default function GerarRelatoriosScreen() {
 
         const dadosParaPlanilha = vendas.map(venda => {
             const valorPago = calcularValorPagoVenda(venda);
+            const dataVendaValida = venda.dataVenda && !isNaN(new Date(venda.dataVenda).getTime()) 
+                ? new Date(venda.dataVenda) 
+                : null;
             return {
-                'Nome do Cliente': venda.clienteNome, 'Telefone': venda.clienteTelefone, 'Data da Venda': new Date(venda.dataVenda), 'Itens': venda.itens?.map(p => `${p.quantidade}x ${p.descricao}`).join('; '), 'Subtotal': venda.subtotal, 'Desconto': venda.desconto || 0, 'Valor Total': venda.valorTotal, 'Valor Pago': valorPago, 'Saldo Devedor': venda.valorTotal - valorPago, 'Status': (venda.valorTotal - valorPago) <= 0.001 ? 'Quitada' : 'Pendente'
+                'Nome do Cliente': venda.clienteNome, 'Telefone': venda.clienteTelefone, 'Data da Venda': dataVendaValida, 'Itens': venda.itens?.map(p => `${p.quantidade}x ${p.descricao}`).join('; '), 'Subtotal': venda.subtotal, 'Desconto': venda.desconto || 0, 'Valor Total': venda.valorTotal, 'Valor Pago': valorPago, 'Saldo Devedor': venda.valorTotal - valorPago, 'Status': (venda.valorTotal - valorPago) <= 0.001 ? 'Quitada' : 'Pendente'
             };
         });
 
         const worksheet = XLSX.utils.json_to_sheet(dadosParaPlanilha);
         worksheet['!cols'] = [ { wch: 25 }, { wch: 15 }, { wch: 12 }, { wch: 40 }, { wch: 10 }, { wch: 10 }, { wch: 10 }, { wch: 10 }, { wch: 12 }, { wch: 10 } ];
         
-        // Formata a coluna de data
         dadosParaPlanilha.forEach((_, index) => {
-            const cellRef = XLSX.utils.encode_cell({c: 2, r: index + 1}); // Coluna 'C' (Data da Venda)
-            if(worksheet[cellRef]) {
+            const cellRef = XLSX.utils.encode_cell({c: 2, r: index + 1});
+            if(worksheet[cellRef] && worksheet[cellRef].v instanceof Date) {
                 worksheet[cellRef].t = 'd';
                 worksheet[cellRef].z = 'dd/mm/yyyy';
             }
@@ -184,7 +175,10 @@ export default function GerarRelatoriosScreen() {
         XLSX.utils.book_append_sheet(workbook, worksheet, "Vendas");
         const wbout = XLSX.write(workbook, { type: 'base64', bookType: 'xlsx' });
         
-        const fileName = `RelatorioVendas_${dataInicio!.toISOString().split('T')[0]}_a_${dataFim!.toISOString().split('T')[0]}.xlsx`;
+        const dataInicioFormatada = formatarDataParaNomeArquivo(dataInicio!);
+        const dataFimFormatada = formatarDataParaNomeArquivo(dataFim!);
+        const fileName = `RelatorioVendas_${dataInicioFormatada}_a_${dataFimFormatada}.xlsx`;
+        
         const fileUri = (FileSystem.cacheDirectory || FileSystem.documentDirectory) + fileName;
         await FileSystem.writeAsStringAsync(fileUri, wbout, { encoding: FileSystem.EncodingType.Base64 });
         
