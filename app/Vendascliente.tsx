@@ -181,6 +181,7 @@ export default function VendasClienteScreen() {
                     tipoPagamento={item.tipoPagamento}
                     numeroParcela={numeroDaParcelaParaLembrete}
                     totalParcelas={item.parcelasTotais}
+                    subtotal={item.subtotal}
                     desconto={item.desconto}
                 />
             )}

@@ -1,3 +1,4 @@
+// app/Gerarrelatorios.tsx
 import React, { useState } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Alert, ActivityIndicator, ScrollView, ImageBackground, SafeAreaView, Platform, StatusBar } from 'react-native';
 import { useRouter } from 'expo-router';
@@ -19,10 +20,9 @@ export default function GerarRelatoriosScreen() {
   const [dataFim, setDataFim] = useState<Date | null>(null);
   const [showDatePicker, setShowDatePicker] = useState<'inicio' | 'fim' | null>(null);
 
-  // ✨ Função auxiliar compartilhada para formatar nomes de arquivo
   const formatarDataParaNomeArquivo = (data: Date): string => {
     const dia = String(data.getDate()).padStart(2, '0');
-    const mes = String(data.getMonth() + 1).padStart(2, '0'); // Mês começa em 0
+    const mes = String(data.getMonth() + 1).padStart(2, '0');
     const ano = data.getFullYear();
     return `${dia}-${mes}-${ano}`;
   };
@@ -81,20 +81,36 @@ export default function GerarRelatoriosScreen() {
       for (const idCliente in vendasPorCliente) {
         const dadosCliente = vendasPorCliente[idCliente];
         corpoTabela += `<div class="cliente-bloco"><h3>Cliente: ${dadosCliente.clienteNome}</h3>`;
-        if (dadosCliente.clienteTelefone) corpoTabela += `<p>Telefone: ${dadosCliente.clienteTelefone}</p>`;
+        if (dadosCliente.clienteTelefone) corpoTabela += `<p class="info-cliente">Telefone: ${dadosCliente.clienteTelefone}</p>`;
         
         let subtotalVendidoCliente = 0;
         let subtotalPagoCliente = 0;
 
-        corpoTabela += `<table><thead><tr><th>Data</th><th>Itens</th><th>Total</th><th>Pago</th><th>Pendente</th></tr></thead><tbody>`;
+        corpoTabela += `<table><thead><tr><th>Data</th><th>Itens</th><th>Pagamento</th><th>Subtotal</th><th>Desconto</th><th>Total</th><th>Pago</th><th>Pendente</th></tr></thead><tbody>`;
         for (const venda of dadosCliente.vendas) {
             const valorPagoVenda = calcularValorPagoVenda(venda);
             subtotalVendidoCliente += venda.valorTotal;
             subtotalPagoCliente += valorPagoVenda;
             valorTotalGeralVendido += venda.valorTotal;
             valorTotalGeralPago += valorPagoVenda;
-            const itensHtml = venda.itens?.map(p => `${p.quantidade}x ${p.descricao}`).join('<br>') || 'N/A';
-            corpoTabela += `<tr><td>${new Date(venda.dataVenda).toLocaleDateString('pt-BR')}</td><td>${itensHtml}</td><td class="text-right">R$ ${venda.valorTotal.toFixed(2)}</td><td class="text-right">R$ ${valorPagoVenda.toFixed(2)}</td><td class="text-right">R$ ${(venda.valorTotal - valorPagoVenda).toFixed(2)}</td></tr>`;
+            const itensHtml = venda.itens?.map(p => `<span>${p.quantidade}x ${p.descricao}</span>`).join('') || 'N/A';
+            let pagamentoHtml = venda.tipoPagamento;
+            if (venda.tipoPagamento === 'Parcelado' && venda.parcelasTotais) {
+                pagamentoHtml += `<br><small>(${venda.parcelasPagas || 0}/${venda.parcelasTotais} pagas)</small>`;
+            }
+
+            corpoTabela += `
+              <tr>
+                <td>${new Date(venda.dataVenda).toLocaleDateString('pt-BR')}</td>
+                <td>${itensHtml}</td>
+                <td>${pagamentoHtml}</td>
+                <td class="text-right">R$ ${(venda.subtotal || venda.valorTotal + (venda.desconto || 0)).toFixed(2)}</td>
+                <td class="text-right">- R$ ${(venda.desconto || 0).toFixed(2)}</td>
+                <td class="text-right"><strong>R$ ${venda.valorTotal.toFixed(2)}</strong></td>
+                <td class="text-right">R$ ${valorPagoVenda.toFixed(2)}</td>
+                <td class="text-right">R$ ${(venda.valorTotal - valorPagoVenda).toFixed(2)}</td>
+              </tr>
+            `;
         }
         corpoTabela += `</tbody></table>`;
         corpoTabela += `<div class="subtotal-cliente"><p><strong>Subtotal para ${dadosCliente.clienteNome}:</strong> Vendido: R$ ${subtotalVendidoCliente.toFixed(2)} | Recebido: R$ ${subtotalPagoCliente.toFixed(2)}</p></div></div>`; 
@@ -113,7 +129,7 @@ export default function GerarRelatoriosScreen() {
       `;
     
     return `
-      <html><head><meta charset="UTF-8"><style>body{font-family:Arial,sans-serif;margin:20px;color:#333}h1{color:#6200EE;text-align:center}h2{color:#3700B3;border-bottom:1px solid #ccc;padding-bottom:5px}h3{color:#444}table{width:100%;border-collapse:collapse;margin-top:15px;font-size:.9em}th,td{border:1px solid #ddd;padding:6px;text-align:left}th{background-color:#f2f2f2}.resumo-geral{background-color:#e9e0ff;padding:15px;border-radius:8px;margin-bottom:20px}.cliente-bloco{page-break-inside:avoid;margin-bottom:20px}.text-right{text-align:right}.total-geral{font-size:1.1em}</style></head>
+      <html><head><meta charset="UTF-8"><style>body{font-family:Arial,sans-serif;margin:20px;color:#333}h1{color:#6200EE;text-align:center}h2{color:#3700B3;border-bottom:1px solid #ccc;padding-bottom:5px}h3{color:#444}.info-cliente{font-size:0.9em;color:#555}table{width:100%;border-collapse:collapse;margin-top:15px;font-size:.85em}th,td{border:1px solid #ddd;padding:6px;text-align:left;vertical-align:top}th{background-color:#f2f2f2}td span{display:block;margin-bottom:3px}.resumo-geral{background-color:#e9e0ff;padding:15px;border-radius:8px;margin-bottom:20px}.cliente-bloco{page-break-inside:avoid;margin-bottom:20px;border:1px solid #eee;padding:10px;border-radius:5px}.text-right{text-align:right}.total-geral{font-size:1.1em}</style></head>
       <body><h1>Relatório Consolidado de Vendas</h1>${resumoGeralHtml}<h2>Detalhes por Cliente</h2>${corpoTabela}</body></html>
     `;
   };
@@ -156,12 +172,23 @@ export default function GerarRelatoriosScreen() {
                 ? new Date(venda.dataVenda) 
                 : null;
             return {
-                'Nome do Cliente': venda.clienteNome, 'Telefone': venda.clienteTelefone, 'Data da Venda': dataVendaValida, 'Itens': venda.itens?.map(p => `${p.quantidade}x ${p.descricao}`).join('; '), 'Subtotal': venda.subtotal, 'Desconto': venda.desconto || 0, 'Valor Total': venda.valorTotal, 'Valor Pago': valorPago, 'Saldo Devedor': venda.valorTotal - valorPago, 'Status': (venda.valorTotal - valorPago) <= 0.001 ? 'Quitada' : 'Pendente'
+                'Nome do Cliente': venda.clienteNome,
+                'Telefone': venda.clienteTelefone,
+                'Data da Venda': dataVendaValida,
+                'Itens': venda.itens?.map(p => `${p.quantidade}x ${p.descricao}`).join('; '),
+                'Forma de Pagamento': venda.tipoPagamento,
+                'Parcelas': venda.tipoPagamento === 'Parcelado' ? `${venda.parcelasPagas || 0}/${venda.parcelasTotais}` : 'N/A',
+                'Subtotal': venda.subtotal,
+                'Desconto': venda.desconto || 0,
+                'Valor Total': venda.valorTotal,
+                'Valor Pago': valorPago,
+                'Saldo Devedor': venda.valorTotal - valorPago,
+                'Status': (venda.valorTotal - valorPago) <= 0.001 ? 'Quitada' : 'Pendente'
             };
         });
 
         const worksheet = XLSX.utils.json_to_sheet(dadosParaPlanilha);
-        worksheet['!cols'] = [ { wch: 25 }, { wch: 15 }, { wch: 12 }, { wch: 40 }, { wch: 10 }, { wch: 10 }, { wch: 10 }, { wch: 10 }, { wch: 12 }, { wch: 10 } ];
+        worksheet['!cols'] = [ { wch: 25 }, { wch: 15 }, { wch: 12 }, { wch: 40 }, {wch: 15}, {wch: 10}, { wch: 10 }, { wch: 10 }, { wch: 10 }, { wch: 10 }, { wch: 12 }, { wch: 10 } ];
         
         dadosParaPlanilha.forEach((_, index) => {
             const cellRef = XLSX.utils.encode_cell({c: 2, r: index + 1});
@@ -203,7 +230,6 @@ export default function GerarRelatoriosScreen() {
                 </TouchableOpacity>
                 <Text style={styles.title}>Gerar Relatórios</Text>
             </View>
-            
             <View style={styles.contentContainer}>
                 <Text style={styles.description}>
                   Selecione o período desejado e exporte um relatório consolidado das vendas.
@@ -212,11 +238,11 @@ export default function GerarRelatoriosScreen() {
                 <View style={styles.datePickerContainer}>
                     <TouchableOpacity style={styles.datePickerButton} onPress={() => setShowDatePicker('inicio')}>
                         <MaterialCommunityIcons name="calendar-start" size={24} color="#E0E0FF" />
-                        <Text style={styles.datePickerText}>{dataInicio ? dataInicio.toLocaleDateString('pt-BR') : 'Data de Início'}</Text>
+                        <Text style={styles.datePickerText}>{dataInicio ? dataInicio.toLocaleDateString('pt-BR') : 'Data Início'}</Text>
                     </TouchableOpacity>
                     <TouchableOpacity style={styles.datePickerButton} onPress={() => setShowDatePicker('fim')}>
                         <MaterialCommunityIcons name="calendar-end" size={24} color="#E0E0FF" />
-                        <Text style={styles.datePickerText}>{dataFim ? dataFim.toLocaleDateString('pt-BR') : 'Data de Fim'}</Text>
+                        <Text style={styles.datePickerText}>{dataFim ? dataFim.toLocaleDateString('pt-BR') : 'Data Fim'}</Text>
                     </TouchableOpacity>
                 </View>
 
@@ -235,7 +261,7 @@ export default function GerarRelatoriosScreen() {
                     disabled={isLoadingPDF || isLoadingXLSX || !dataInicio || !dataFim}
                 >
                     {isLoadingXLSX ? <ActivityIndicator size="small" color="#FFFFFF" /> : <MaterialCommunityIcons name="microsoft-excel" size={28} color="#FFFFFF" />}
-                    <Text style={styles.actionButtonText}>Exportar para Excel (.xlsx)</Text>
+                    <Text style={styles.actionButtonText}>Exportar para Excel </Text>
                 </TouchableOpacity>
 
                 <TouchableOpacity 
@@ -244,7 +270,7 @@ export default function GerarRelatoriosScreen() {
                     disabled={isLoadingPDF || isLoadingXLSX || !dataInicio || !dataFim}
                 >
                 {isLoadingPDF ? <ActivityIndicator size="small" color="#FFFFFF" /> : <MaterialCommunityIcons name="file-pdf-box" size={28} color="#FFFFFF" />}
-                <Text style={styles.actionButtonText}>Exportar Relatório PDF</Text>
+                <Text style={styles.actionButtonText}>Exportar para  PDF</Text>
                 </TouchableOpacity>
             </View>
         </ScrollView>
@@ -301,42 +327,41 @@ const styles = StyleSheet.create({
   datePickerButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(255, 255, 255, 0.15)',
+    backgroundColor: '#352366',
+    borderRadius: 12,
     paddingVertical: 12,
-    paddingHorizontal: 15,
-    borderRadius: 8,
-    width: '48%',
+    paddingHorizontal: 16,
+    flex: 1,
+    marginHorizontal: 5,
   },
   datePickerText: {
-    color: '#FFFFFF',
-    fontSize: 16,
-    marginLeft: 10,
+    color: '#E0E0FF',
+    fontSize: 14,
+    marginLeft: 7,
   },
   actionButton: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    width: '100%',
-    paddingVertical: 18,
     borderRadius: 12,
+    paddingVertical: 14,
+    paddingHorizontal: 20,
     marginBottom: 15,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.2)',
-    elevation: 4,
+    width: '100%',
   },
   xlsxButton: {
-    backgroundColor: '#1D6F42',
+    backgroundColor: '#2B7A0B',
   },
   pdfButton: {
-    backgroundColor: 'rgba(211, 47, 47, 0.8)',
+    backgroundColor: '#B11226',
   },
   actionButtonText: {
-    color: 'white',
-    fontSize: 17,
-    fontWeight: 'bold',
-    marginLeft: 15,
+    color: '#FFFFFF',
+    fontSize: 18,
+    fontWeight: '600',
+    marginLeft: 12,
   },
   disabledButton: {
-      opacity: 0.5,
+    opacity: 0.6,
   },
 });

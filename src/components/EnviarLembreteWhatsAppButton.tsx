@@ -11,6 +11,7 @@ interface LembreteWhatsAppProps {
   tipoPagamento: 'À Vista' | 'Parcelado';
   numeroParcela?: number;
   totalParcelas?: number;
+  subtotal: number;
   desconto?: number; // ✨ 1. Adicionada a nova propriedade para o desconto
   style?: StyleProp<ViewStyle>;
 }
@@ -24,6 +25,7 @@ const EnviarLembreteWhatsAppButton: React.FC<LembreteWhatsAppProps> = ({
   tipoPagamento,
   numeroParcela,
   totalParcelas,
+  subtotal,
   desconto, // ✨ 2. Recebendo a nova propriedade
   style,
 }) => {
@@ -72,6 +74,7 @@ const EnviarLembreteWhatsAppButton: React.FC<LembreteWhatsAppProps> = ({
     let mensagem = `Olá ${nomeCliente},\n\n`;
     mensagem += `Estou passando só pra lembrar ${tipoLembrete}, da compra realizada em ${dataCompraFormatada}. `;
     mensagem += `O valor de R$ ${valorLembrete.toFixed(2)} vence em ${dataVencimentoFormatada}.\n`;
+    mensagem += `Valor total da compra (sem desconto): R$ ${subtotal.toFixed(2)}.\n`;
 
     // Adiciona a linha do desconto apenas se ele existir e for maior que zero
     if (desconto && desconto > 0) {
