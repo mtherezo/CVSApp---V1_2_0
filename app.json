@@ -2,7 +2,7 @@
   "expo": {
     "name": "CVSApp",
     "slug": "CVSApp",
-    "version": "2.0.1",
+    "version": "2.1.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "cvsapp",
@@ -21,8 +21,12 @@
         "backgroundColor": "#ffffff"
       },
       "package": "com.seunome.cvsapp",
-      "versionCode": 2,
-      "permissions": [],
+      "versionCode": 3,
+      "permissions": [
+        "READ_EXTERNAL_STORAGE",
+        "WRITE_EXTERNAL_STORAGE",
+        "ACCESS_MEDIA_LOCATION"
+      ],
       "queries": [
         {
           "package": "com.whatsapp"
@@ -41,7 +45,8 @@
       "expo-router",
       "expo-secure-store",
       "expo-web-browser",
-      "expo-sqlite"
+      "expo-sqlite",
+      "expo-document-picker" 
     ],
     "experiments": {
       "typedRoutes": true

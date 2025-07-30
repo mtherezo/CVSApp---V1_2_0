@@ -1,7 +1,7 @@
 // src/database/sqlite.ts
 import * as SQLite from 'expo-sqlite';
 import * as Crypto from 'expo-crypto';
-import { Cliente, Venda, Pagamento, ItemVenda, Usuario } from '../types';
+import { Cliente, Venda, Pagamento, ItemVenda, Usuario, Produto } from '../types'; // Adicionado Produto
 
 export const db = SQLite.openDatabaseSync('cvsapp.db');
 
@@ -27,6 +27,11 @@ export const setupDatabase = async () => {
                 version: 2,
                 queries: [ `ALTER TABLE clientes ADD COLUMN endereco TEXT;` ],
             },
+            // ✨ NOVA MIGRAÇÃO PARA A TABELA DE PRODUTOS
+            {
+                version: 3,
+                queries: [ `CREATE TABLE IF NOT EXISTS produtos (id TEXT PRIMARY KEY NOT NULL, descricao TEXT NOT NULL UNIQUE, valor REAL NOT NULL);` ],
+            }
         ];
 
         const targetVersion = MIGRATIONS.length;
@@ -81,121 +86,53 @@ export const inserirVendaCompleta = async (venda: Venda) => {
 
 // --- Funções CRUD para Clientes ---
 export const listarClientesSQLite = async (): Promise<Cliente[]> => await db.getAllAsync<Cliente>('SELECT * FROM clientes ORDER BY nome ASC');
-
 export const cadastrarClienteSQLite = async (cliente: Cliente) => {
-    await db.runAsync(
-        `INSERT INTO clientes (id, nome, telefone, email, endereco) VALUES (?, ?, ?, ?, ?)
-         ON CONFLICT(id) DO UPDATE SET
-         nome = excluded.nome,
-         telefone = excluded.telefone,
-         email = excluded.email,
-         endereco = excluded.endereco;`,
-        cliente.id,
-        cliente.nome,
-        cliente.telefone || null,
-        cliente.email || null,
-        cliente.endereco || null
-    );
+    await db.runAsync(`INSERT INTO clientes (id, nome, telefone, email, endereco) VALUES (?, ?, ?, ?, ?) ON CONFLICT(id) DO UPDATE SET nome = excluded.nome, telefone = excluded.telefone, email = excluded.email, endereco = excluded.endereco;`,
+        cliente.id, cliente.nome, cliente.telefone || null, cliente.email || null, cliente.endereco || null);
 };
-
 export const excluirClienteSQLite = async (idCliente: string) => await db.runAsync('DELETE FROM clientes WHERE id = ?;', idCliente);
-
 export const buscarClientePorIdSQLite = async (id: string): Promise<Cliente | null> => await db.getFirstAsync<Cliente>('SELECT * FROM clientes WHERE id = ?;', id);
-
-export const pesquisarClientesPorNomeSQLite = async (termo: string): Promise<Cliente[]> => {
-  const termoLike = `%${termo}%`;
-  return await db.getAllAsync<Cliente>(
-    'SELECT * FROM clientes WHERE nome LIKE ? ORDER BY nome ASC;',
-    termoLike
-  );
-};
+export const pesquisarClientesPorNomeSQLite = async (termo: string): Promise<Cliente[]> => await db.getAllAsync<Cliente>('SELECT * FROM clientes WHERE nome LIKE ? ORDER BY nome ASC;', `%${termo}%`);
 
 // --- Funções CRUD para Vendas e Pagamentos ---
 export const cadastrarVendaSQLite = async (venda: Omit<Venda, 'id' | 'clienteNome' | 'clienteTelefone' | 'itens' | 'pagamentos'> & { idCliente: string, itens: Omit<ItemVenda, 'idVenda'>[] }): Promise<Venda> => {
     const cliente = await buscarClientePorIdSQLite(venda.idCliente);
     if (!cliente) throw new Error("Cliente não encontrado para realizar a venda.");
-
-    const novaVenda: Venda = {
-        subtotal: venda.subtotal,
-        valorTotal: venda.valorTotal,
-        dataVenda: venda.dataVenda,
-        tipoPagamento: venda.tipoPagamento,
-        desconto: venda.desconto,
-        parcelasTotais: venda.parcelasTotais,
-        parcelasPagas: venda.parcelasPagas,
-        dataPrimeiraParcela: venda.dataPrimeiraParcela,
-        id: Crypto.randomUUID(),
-        idCliente: venda.idCliente,
-        clienteNome: cliente.nome,
-        clienteTelefone: cliente.telefone,
-        itens: venda.itens as ItemVenda[],
-        pagamentos: [],
-    };
-    
+    const novaVenda: Venda = { ...venda, id: Crypto.randomUUID(), clienteNome: cliente.nome, clienteTelefone: cliente.telefone, itens: venda.itens as ItemVenda[], pagamentos: [] };
     await inserirVendaCompleta(novaVenda);
     return novaVenda;
 };
-
 export const editarVendaSQLite = async (venda: Venda) => {
-    await db.withTransactionAsync(async () => {
-        const vendaSql = `
-            UPDATE vendas SET
-                valorTotal = ?, subtotal = ?, desconto = ?, tipoPagamento = ?,
-                parcelasTotais = ?, parcelasPagas = ?, dataPrimeiraParcela = ?
-            WHERE id = ?;
-        `;
-        await db.runAsync(vendaSql,
-            venda.valorTotal, venda.subtotal || null, venda.desconto || null,
-            venda.tipoPagamento, venda.parcelasTotais || null, venda.parcelasPagas || null,
-            venda.dataPrimeiraParcela || null, venda.id
-        );
-
-        await db.runAsync('DELETE FROM itens_venda WHERE idVenda = ?;', venda.id);
-
-        if (venda.itens && venda.itens.length > 0) {
-            const itemSql = 'INSERT INTO itens_venda (id, idVenda, descricao, quantidade, valor) VALUES (?, ?, ?, ?, ?);';
-            for (const item of venda.itens) {
-                const itemId = item.id || Crypto.randomUUID(); 
-                await db.runAsync(itemSql, itemId, venda.id, item.descricao, item.quantidade, item.valor);
-            }
-        }
-    });
+    await db.withTransactionAsync(async () => {
+        await db.runAsync(`UPDATE vendas SET valorTotal = ?, subtotal = ?, desconto = ?, tipoPagamento = ?, parcelasTotais = ?, parcelasPagas = ?, dataPrimeiraParcela = ? WHERE id = ?;`,
+            venda.valorTotal, venda.subtotal || null, venda.desconto || null, venda.tipoPagamento,
+            venda.parcelasTotais || null, venda.parcelasPagas || null, venda.dataPrimeiraParcela || null, venda.id);
+        await db.runAsync('DELETE FROM itens_venda WHERE idVenda = ?;', venda.id);
+        if (venda.itens && venda.itens.length > 0) {
+            for (const item of venda.itens) {
+                await db.runAsync('INSERT INTO itens_venda (id, idVenda, descricao, quantidade, valor) VALUES (?, ?, ?, ?, ?);', item.id || Crypto.randomUUID(), venda.id, item.descricao, item.quantidade, item.valor);
+            }
+        }
+    });
 };
-
 export const listarTodasVendasSQLite = async (): Promise<Venda[]> => {
     const vendas = await db.getAllAsync<Venda>('SELECT * FROM vendas ORDER BY dataVenda DESC');
     if (vendas.length === 0) return [];
-    
     const vendaIds = vendas.map(v => v.id);
     const placeholders = vendaIds.map(() => '?').join(',');
-
     const todosItens = await db.getAllAsync<ItemVenda>(`SELECT * FROM itens_venda WHERE idVenda IN (${placeholders})`, ...vendaIds);
     const todosPagamentos = await db.getAllAsync<Pagamento>(`SELECT * FROM pagamentos WHERE idVenda IN (${placeholders})`, ...vendaIds);
-
-    return vendas.map(venda => ({
-        ...venda,
-        itens: todosItens.filter(item => item.idVenda && item.idVenda === venda.id),
-        pagamentos: todosPagamentos.filter(pagamento => pagamento.idVenda && pagamento.idVenda === venda.id)
-    }));
+    return vendas.map(venda => ({ ...venda, itens: todosItens.filter(item => item.idVenda === venda.id), pagamentos: todosPagamentos.filter(p => p.idVenda === venda.id) }));
 };
-
 export const listarVendasPorClienteSQLite = async (idCliente: string): Promise<Venda[]> => {
     const vendas = await db.getAllAsync<Venda>('SELECT * FROM vendas WHERE idCliente = ? ORDER BY dataVenda DESC', idCliente);
     if (vendas.length === 0) return [];
-
     const vendaIds = vendas.map(v => v.id);
     const placeholders = vendaIds.map(() => '?').join(',');
-
     const todosItens = await db.getAllAsync<ItemVenda>(`SELECT * FROM itens_venda WHERE idVenda IN (${placeholders})`, ...vendaIds);
     const todosPagamentos = await db.getAllAsync<Pagamento>(`SELECT * FROM pagamentos WHERE idVenda IN (${placeholders})`, ...vendaIds);
-    
-    return vendas.map(venda => ({
-        ...venda,
-        itens: todosItens.filter(item => item.idVenda && item.idVenda === venda.id),
-        pagamentos: todosPagamentos.filter(pagamento => pagamento.idVenda && pagamento.idVenda === venda.id)
-    }));
+    return vendas.map(venda => ({ ...venda, itens: todosItens.filter(item => item.idVenda === venda.id), pagamentos: todosPagamentos.filter(p => p.idVenda === venda.id) }));
 };
-
 export const listarVendaPorIdSQLite = async (idVenda: string): Promise<Venda | null> => {
     const venda = await db.getFirstAsync<Venda>('SELECT * FROM vendas WHERE id = ?', idVenda);
     if (venda) {
@@ -204,68 +141,33 @@ export const listarVendaPorIdSQLite = async (idVenda: string): Promise<Venda | n
     }
     return venda;
 };
-
 export const listarVendasPorPeriodoSQLite = async (dataInicio: string, dataFim: string): Promise<Venda[]> => {
-    const vendas = await db.getAllAsync<Venda>(
-        'SELECT * FROM vendas WHERE dataVenda >= ? AND dataVenda <= ? ORDER BY dataVenda DESC',
-        dataInicio,
-        dataFim
-    );
-
+    const vendas = await db.getAllAsync<Venda>('SELECT * FROM vendas WHERE dataVenda >= ? AND dataVenda <= ? ORDER BY dataVenda DESC', dataInicio, dataFim);
     if (vendas.length === 0) return [];
-    
     const vendaIds = vendas.map(v => v.id);
     const placeholders = vendaIds.map(() => '?').join(',');
-
     const todosItens = await db.getAllAsync<ItemVenda>(`SELECT * FROM itens_venda WHERE idVenda IN (${placeholders})`, ...vendaIds);
     const todosPagamentos = await db.getAllAsync<Pagamento>(`SELECT * FROM pagamentos WHERE idVenda IN (${placeholders})`, ...vendaIds);
-
-    return vendas.map(venda => ({
-        ...venda,
-        itens: todosItens.filter(item => item.idVenda && item.idVenda === venda.id),
-        pagamentos: todosPagamentos.filter(pagamento => pagamento.idVenda && pagamento.idVenda === venda.id)
-    }));
+    return vendas.map(venda => ({ ...venda, itens: todosItens.filter(item => item.idVenda === venda.id), pagamentos: todosPagamentos.filter(p => p.idVenda === venda.id) }));
 };
-
 export const excluirVendaSQLite = async (idVenda: string) => await db.runAsync('DELETE FROM vendas WHERE id = ?;', idVenda);
-
-export const registrarPagamentoSQLite = async (idVenda: string, valor: number, dataPagamento: string) => {
-    const pagamentoId = Crypto.randomUUID();
-    await db.runAsync('INSERT INTO pagamentos (id, idVenda, dataPagamento, valorPago) VALUES (?, ?, ?, ?);', pagamentoId, idVenda, dataPagamento, valor);
-};
-
+export const registrarPagamentoSQLite = async (idVenda: string, valor: number, dataPagamento: string) => await db.runAsync('INSERT INTO pagamentos (id, idVenda, dataPagamento, valorPago) VALUES (?, ?, ?, ?);', Crypto.randomUUID(), idVenda, dataPagamento, valor);
 export const excluirPagamentoSQLite = async (idPagamento: string) => await db.runAsync('DELETE FROM pagamentos WHERE id = ?;', idPagamento);
-
-// ✨ FUNÇÃO ADICIONADA QUE ESTAVA A FALTAR
-export const listarPagamentosSQLite = async (idVenda: string): Promise<Pagamento[]> => {
-    return await db.getAllAsync<Pagamento>('SELECT * FROM pagamentos WHERE idVenda = ? ORDER BY dataPagamento ASC', idVenda);
-};
-
-export const atualizarVendaSQLite = async (venda: Pick<Venda, 'id' | 'parcelasPagas'>) => {
-    await db.runAsync(
-        'UPDATE vendas SET parcelasPagas = ? WHERE id = ?;',
-        venda.parcelasPagas || 0,
-        venda.id
-    );
-};
+export const listarPagamentosSQLite = async (idVenda: string): Promise<Pagamento[]> => await db.getAllAsync<Pagamento>('SELECT * FROM pagamentos WHERE idVenda = ? ORDER BY dataPagamento ASC', idVenda);
+export const atualizarVendaSQLite = async (venda: Pick<Venda, 'id' | 'parcelasPagas'>) => await db.runAsync('UPDATE vendas SET parcelasPagas = ? WHERE id = ?;', venda.parcelasPagas || 0, venda.id);
 
 // --- Funções CRUD para Usuários ---
-export const cadastrarUsuarioSQLite = async (usuario: Usuario) => {
-    await db.runAsync(
-        'INSERT INTO usuarios (username, passwordHash) VALUES (?, ?);',
-        usuario.username,
-        usuario.passwordHash
-    );
-};
+export const cadastrarUsuarioSQLite = async (usuario: Usuario) => await db.runAsync('INSERT INTO usuarios (username, passwordHash) VALUES (?, ?);', usuario.username, usuario.passwordHash);
+export const buscarUsuarioPorUsernameSQLite = async (username: string): Promise<Usuario | null> => await db.getFirstAsync<Usuario>('SELECT * FROM usuarios WHERE username = ?;', username);
+export const excluirUsuarioSQLite = async (username: string): Promise<boolean> => (await db.runAsync('DELETE FROM usuarios WHERE username = ?;', username)).changes > 0;
 
-export const buscarUsuarioPorUsernameSQLite = async (username: string): Promise<Usuario | null> => {
-    return await db.getFirstAsync<Usuario>(
-        'SELECT * FROM usuarios WHERE username = ?;',
-        username
-    );
+// ✨ --- FUNÇÕES CRUD PARA PRODUTOS ---
+export const listarProdutosSQLite = async (): Promise<Produto[]> => await db.getAllAsync<Produto>('SELECT * FROM produtos ORDER BY descricao ASC');
+export const cadastrarProdutoSQLite = async (produto: Produto) => {
+    await db.runAsync(
+        `INSERT INTO produtos (id, descricao, valor) VALUES (?, ?, ?)
+         ON CONFLICT(id) DO UPDATE SET descricao = excluded.descricao, valor = excluded.valor;`,
+        produto.id, produto.descricao, produto.valor
+    );
 };
-
-export const excluirUsuarioSQLite = async (username: string): Promise<boolean> => {
-    const result = await db.runAsync('DELETE FROM usuarios WHERE username = ?;', username);
-    return result.changes > 0;
-};
+export const excluirProdutoSQLite = async (idProduto: string) => await db.runAsync('DELETE FROM produtos WHERE id = ?;', idProduto);

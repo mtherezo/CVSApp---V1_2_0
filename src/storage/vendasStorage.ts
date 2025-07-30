@@ -1,164 +1,133 @@
 // src/storage/vendasStorage.ts
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import { Venda, Pagamento } from '../types';
-import uuid from 'react-native-uuid';
 import { Alert } from 'react-native';
+import {
+    cadastrarVendaSQLite,
+    editarVendaSQLite, // ✨ 1. Importa a nova função de edição da base de dados
+    listarTodasVendasSQLite,
+    listarVendasPorClienteSQLite,
+    listarVendaPorIdSQLite,
+    excluirVendaSQLite,
+    registrarPagamentoSQLite,
+    excluirPagamentoSQLite,
+    listarPagamentosSQLite,
+    atualizarVendaSQLite
+} from '../database/sqlite';
+import { Venda, Pagamento } from '../types';
 
-const VENDAS_KEY = 'vendas';
-
-// Função auxiliar para obter vendas
-async function obterVendas(): Promise<Venda[]> {
-  try {
-    const dados = await AsyncStorage.getItem(VENDAS_KEY);
-    return dados ? JSON.parse(dados) : [];
-  } catch (error) {
-    console.error("Erro ao obter vendas:", error);
-    return [];
-  }
-}
-
-// Função para listar vendas de um cliente específico
-export async function listarVendasPorCliente(idCliente: string): Promise<Venda[]> {
-  try {
-    const vendas = await obterVendas();
-    return vendas.filter((v) => v.idCliente === idCliente);
-  } catch (error) {
-    console.error("Erro ao listar vendas:", error);
-    return [];
-  }
-}
-
-// Função para cadastrar uma nova venda
-export async function cadastrarVenda(novaVenda: Omit<Venda, 'id'>): Promise<Venda | null> {
-  try {
-    const vendas = await obterVendas();
-    const vendaComId: Venda = {
-        ...novaVenda, 
-        id: uuid.v4().toString(), 
-        pagamentos: novaVenda.pagamentos || [], // Garante que pagamentos seja um array
-    };
-    vendas.push(vendaComId);
-    await AsyncStorage.setItem(VENDAS_KEY, JSON.stringify(vendas));
-    return vendaComId;
-  } catch (error) {
-    console.error("Erro ao cadastrar venda:", error);
-    return null;
-  }
-}
-
-// Função para buscar uma venda por ID
-export async function listarVendaPorId(idVenda: string): Promise<Venda | null> {
-  try {
-    const vendas = await obterVendas();
-    const venda = vendas.find(v => v.id === idVenda);
-    return venda || null;
-  } catch (error) {
-    console.error("Erro ao buscar venda:", error);
-    return null;
-  }
-}
-
-// Função para registrar um pagamento
-export async function registrarPagamento(idVenda: string, valorPago: number): Promise<boolean> {
-  try {
-    const vendas = await obterVendas();
-    const vendaIndex = vendas.findIndex(v => v.id === idVenda);
-    if (vendaIndex === -1) {
-      Alert.alert("Erro", "Venda não encontrada.");
-      return false;
+export const cadastrarVenda = async (venda: Omit<Venda, 'id'>): Promise<Venda | null> => {
+    try {
+        const vendaCompleta = await cadastrarVendaSQLite(venda as any);
+        return vendaCompleta;
+    } catch (error) {
+        console.error("Erro ao cadastrar venda no SQLite:", error);
+        return null;
     }
-    const venda = vendas[vendaIndex];
-    
-    const totalJaPago = venda.pagamentos?.reduce((acc, p) => acc + p.valorPago, 0) || 0;
-    if ((totalJaPago + valorPago) > venda.valorTotal + 0.001) {
-        Alert.alert("Valor excedido", `O valor do pagamento excede o saldo devedor.`);
+};
+
+// ✨ 2. NOVA FUNÇÃO ADICIONADA E EXPORTADA
+/**
+ * Edita uma venda existente na base de dados.
+ */
+export const editarVenda = async (vendaEditada: Venda): Promise<boolean> => {
+    try {
+        await editarVendaSQLite(vendaEditada);
+        return true;
+    } catch (error) {
+        console.error(`Erro ao editar a venda ${vendaEditada.id} no SQLite:`, error);
         return false;
     }
+};
 
-    const novoPagamento: Pagamento = {
-      id: uuid.v4().toString(),
-      dataPagamento: new Date().toISOString(),
-      valorPago,
-      idVenda: ''
-    };
-    venda.pagamentos = venda.pagamentos || [];
-    venda.pagamentos.push(novoPagamento);
-    if (venda.tipoPagamento === 'Parcelado' && venda.parcelasTotais) {
-      venda.parcelasPagas = (venda.parcelasPagas || 0) + 1;
+export const listarTodasVendas = async (): Promise<Venda[]> => {
+    try {
+        return await listarTodasVendasSQLite();
+    } catch (error) {
+        console.error("Erro ao listar todas as vendas do SQLite:", error);
+        return [];
     }
-    vendas[vendaIndex] = venda;
-    await AsyncStorage.setItem(VENDAS_KEY, JSON.stringify(vendas));
-    return true;
-  } catch (error) {
-    console.error("Erro ao registrar pagamento:", error);
-    return false;
-  }
-}
+};
 
-// Função para excluir um pagamento
-export async function excluirPagamento(idVenda: string, idPagamento: string): Promise<boolean> {
-  try {
-    const vendas = await obterVendas();
-    const vendaIndex = vendas.findIndex(v => v.id === idVenda);
-    if (vendaIndex === -1) return false;
-    
-    const venda = vendas[vendaIndex];
-    const tamanhoOriginal = venda.pagamentos?.length || 0;
-    venda.pagamentos = venda.pagamentos?.filter(p => p.id !== idPagamento);
+export const listarVendasPorCliente = async (idCliente: string): Promise<Venda[]> => {
+    try {
+        return await listarVendasPorClienteSQLite(idCliente);
+    } catch (error) {
+        console.error(`Erro ao listar vendas do cliente ${idCliente} do SQLite:`, error);
+        return [];
+    }
+};
 
-    if (venda.pagamentos && venda.pagamentos.length < tamanhoOriginal) {
-        if(venda.tipoPagamento === 'Parcelado' && venda.parcelasPagas && venda.parcelasPagas > 0) {
-            venda.parcelasPagas--;
+export const listarVendaPorId = async (idVenda: string): Promise<Venda | null> => {
+    try {
+        return await listarVendaPorIdSQLite(idVenda);
+    } catch (error) {
+        console.error(`Erro ao buscar venda ${idVenda} do SQLite:`, error);
+        return null;
+    }
+};
+
+export const excluirVenda = async (idVenda: string): Promise<boolean> => {
+    try {
+        await excluirVendaSQLite(idVenda);
+        return true;
+    } catch (error) {
+        console.error(`Erro ao excluir venda ${idVenda} do SQLite:`, error);
+        return false;
+    }
+};
+
+export const registrarPagamento = async (idVenda: string, valor: number): Promise<boolean> => {
+    try {
+        const venda = await listarVendaPorId(idVenda);
+        if (!venda) {
+            Alert.alert("Erro", "Venda não encontrada.");
+            return false;
         }
+
+        const totalJaPago = venda.pagamentos?.reduce((acc, p) => acc + p.valorPago, 0) || 0;
+        if ((totalJaPago + valor) > venda.valorTotal + 0.001) {
+            Alert.alert("Valor excedido", `O valor do pagamento excede o saldo devedor.`);
+            return false;
+        }
+
+        await registrarPagamentoSQLite(idVenda, valor, new Date().toISOString());
+
+        if (venda.tipoPagamento === 'Parcelado' && venda.parcelasTotais) {
+            venda.parcelasPagas = (venda.parcelasPagas || 0) + 1;
+            await atualizarVendaSQLite(venda);
+        }
+        
+        return true;
+    } catch (error) {
+        console.error(`Erro ao registrar pagamento para a venda ${idVenda} no SQLite:`, error);
+        return false;
     }
+};
 
-    vendas[vendaIndex] = venda;
-    await AsyncStorage.setItem(VENDAS_KEY, JSON.stringify(vendas));
-    return true;
-  } catch (error) {
-    console.error("Erro ao excluir pagamento:", error);
-    return false;
-  }
-}
+export const excluirPagamento = async (idVenda: string, idPagamento: string): Promise<boolean> => {
+    try {
+        const venda = await listarVendaPorId(idVenda);
+        if (!venda) return false;
 
-// Função para listar pagamentos
-export async function listarPagamentos(idVenda: string): Promise<Pagamento[]> {
-  try {
-    const venda = await listarVendaPorId(idVenda);
-    return venda?.pagamentos || [];
-  } catch (error) {
-    console.error("Erro ao listar pagamentos:", error);
-    return [];
-  }
-}
+        await excluirPagamentoSQLite(idPagamento);
 
-// Função para excluir uma venda
-export async function excluirVenda(idVenda: string): Promise<boolean> {
-  try {
-    const vendas = await obterVendas();
-    const novasVendas = vendas.filter((v: Venda) => v.id !== idVenda);
-    await AsyncStorage.setItem(VENDAS_KEY, JSON.stringify(novasVendas));
-    return true;
-  } catch (error) {
-    console.error("Erro ao excluir venda:", error);
-    return false;
-  }
-}
+        if (venda.tipoPagamento === 'Parcelado' && venda.parcelasPagas && venda.parcelasPagas > 0) {
+            venda.parcelasPagas--;
+            await atualizarVendaSQLite(venda);
+        }
 
-// Função para excluir todas as vendas de um cliente
-export async function excluirVendasPorCliente(idCliente: string): Promise<boolean> {
-  try {
-    const vendas = await obterVendas();
-    const novasVendas = vendas.filter((v: Venda) => v.idCliente !== idCliente);
-    await AsyncStorage.setItem(VENDAS_KEY, JSON.stringify(novasVendas));
-    return true;
-  } catch (error) {
-    console.error("Erro ao excluir vendas do cliente:", error);
-    return false;
-  }
-}
+        return true;
+    } catch (error) {
+        console.error(`Erro ao excluir pagamento ${idPagamento} do SQLite:`, error);
+        return false;
+    }
+};
 
-// Função para listar todas as vendas
-export async function listarTodasVendas(): Promise<Venda[]> {
-  return await obterVendas();
-}
+export const listarPagamentos = async (idVenda: string): Promise<Pagamento[]> => {
+    try {
+        const venda = await listarVendaPorId(idVenda);
+        return venda?.pagamentos || [];
+    } catch (error) {
+        console.error(`Erro ao listar pagamentos da venda ${idVenda} do SQLite:`, error);
+        return [];
+    }
+};

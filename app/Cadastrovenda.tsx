@@ -1,27 +1,18 @@
-//app/Cadastrovenda.tsx
-import React, { useState, useCallback } from 'react';
+// app/Cadastrovenda.tsx
+import React, { useState, useCallback, useEffect } from 'react';
 import {
-  View,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  StyleSheet,
-  Alert,
-  ImageBackground,
-  Platform,
-  KeyboardAvoidingView,
-  ActivityIndicator,
-  ScrollView,
-  SafeAreaView,
-  StatusBar,
+    View, Text, TextInput, TouchableOpacity, StyleSheet, Alert, ImageBackground,
+    Platform, KeyboardAvoidingView, ActivityIndicator, SafeAreaView, StatusBar, FlatList
 } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
-import { cadastrarVendaSQLite } from '../src/database/sqlite';
-import { Venda, ItemVenda } from '../src/types';
+import { cadastrarVenda, editarVenda, listarVendaPorId } from '../src/storage/vendasStorage';
+import { listarProdutos } from '../src/storage/produtosStorage';
+import { Venda, ItemVenda, Produto } from '../src/types';
 import * as Crypto from 'expo-crypto';
 import DateTimePicker, { DateTimePickerEvent } from '@react-native-community/datetimepicker';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 
+// Componente Memoizado para itens da venda (sem alterações)
 const MemoizedItemAdicionado = React.memo(({ item, onRemove }: { item: Omit<ItemVenda, 'idVenda'>, onRemove: (id: string) => void }) => {
     const subtotalItem = item.valor * item.quantidade;
     return (
@@ -37,198 +28,300 @@ const MemoizedItemAdicionado = React.memo(({ item, onRemove }: { item: Omit<Item
     );
 });
 
+// Componente para a visão do Catálogo de Produtos (sem alterações)
+const CatalogoProdutosView = ({ produtos, onSelect, onClose }: { produtos: Produto[], onSelect: (produto: Produto) => void, onClose: () => void }) => (
+    <View style={styles.catalogoContainer}>
+        <Text style={styles.catalogoTitle}>Selecione um Produto</Text>
+        <FlatList
+            data={produtos}
+            keyExtractor={(item) => item.id}
+            renderItem={({ item }) => (
+                <TouchableOpacity style={styles.productListItem} onPress={() => onSelect(item)}>
+                    <Text style={styles.productListItemDesc}>{item.descricao}</Text>
+                    <Text style={styles.productListItemValue}>{`R$ ${item.valor.toFixed(2)}`}</Text>
+                </TouchableOpacity>
+            )}
+            ListEmptyComponent={<Text style={styles.emptyListText}>Nenhum produto no catálogo. Adicione na tela de "Catálogo".</Text>}
+            style={{ maxHeight: 250 }}
+        />
+        <TouchableOpacity style={[styles.catalogoButton, styles.cancelButton]} onPress={onClose}>
+            <Text style={styles.catalogoButtonText}>Fechar Catálogo</Text>
+        </TouchableOpacity>
+    </View>
+);
+
+
 export default function CadastroVendaScreen() {
-  const router = useRouter();
-  const { idCliente, nome: clienteNome } = useLocalSearchParams<{ idCliente?: string; nome?: string; }>();
+    const router = useRouter();
+    const { idCliente, nome: clienteNome, telefone: clienteTelefone, idVenda } = useLocalSearchParams<{ idCliente?: string; nome?: string; telefone?: string; idVenda?: string }>();
+    const isEditing = !!idVenda;
 
-  const [itens, setItens] = useState<Omit<ItemVenda, 'idVenda'>[]>([]);
-  const [itemDescricao, setItemDescricao] = useState('');
-  const [itemValor, setItemValor] = useState('');
-  const [itemQuantidade, setItemQuantidade] = useState('1');
-  const [desconto, setDesconto] = useState('');
-  const [tipoPagamento, setTipoPagamento] = useState<'À Vista' | 'Parcelado'>('À Vista');
-  const [quantidadeParcelas, setQuantidadeParcelas] = useState('2');
-  
-  // ✨ States para a nova funcionalidade de data
-  const [dataVenda, setDataVenda] = useState(new Date());
-  const [showDatePickerVenda, setShowDatePickerVenda] = useState(false);
-  
-  const [dataPrimeiraParcela, setDataPrimeiraParcela] = useState(new Date());
-  const [mostrarDataPickerParcela, setMostrarDataPickerParcela] = useState(false);
-  const [isSaving, setIsSaving] = useState(false);
+    const [catalogoProdutos, setCatalogoProdutos] = useState<Produto[]>([]);
+    const [catalogoVisivel, setCatalogoVisivel] = useState(false);
+    const [itens, setItens] = useState<Omit<ItemVenda, 'idVenda'>[]>([]);
+    const [itemDescricao, setItemDescricao] = useState('');
+    const [itemValor, setItemValor] = useState('');
+    const [itemQuantidade, setItemQuantidade] = useState('1');
+    const [desconto, setDesconto] = useState('');
+    const [tipoPagamento, setTipoPagamento] = useState<'À Vista' | 'Parcelado'>('À Vista');
+    const [quantidadeParcelas, setQuantidadeParcelas] = useState('2');
+    const [dataVenda, setDataVenda] = useState(new Date());
+    const [showDatePickerVenda, setShowDatePickerVenda] = useState(false);
+    const [dataPrimeiraParcela, setDataPrimeiraParcela] = useState(new Date());
+    const [mostrarDataPickerParcela, setMostrarDataPickerParcela] = useState(false);
+    const [isSaving, setIsSaving] = useState(false);
+    const [isLoadingData, setIsLoadingData] = useState(true);
+    const [vendaOriginal, setVendaOriginal] = useState<Venda | null>(null);
 
-  const subtotal = itens.reduce((total, item) => total + (item.valor * item.quantidade), 0);
-  const valorDesconto = parseFloat(desconto.replace(',', '.')) || 0;
-  const totalFinal = Math.max(0, subtotal - valorDesconto);
+    useEffect(() => {
+        const carregarDadosIniciais = async () => {
+            try {
+                const produtosDoCatalogo = await listarProdutos();
+                setCatalogoProdutos(produtosDoCatalogo);
 
-  const handleAdicionarItem = () => {
-    const valorNum = parseFloat(itemValor.replace(',', '.'));
-    const quantidadeNum = parseInt(itemQuantidade, 10);
-    if (!itemDescricao.trim() || isNaN(valorNum) || valorNum <= 0 || isNaN(quantidadeNum) || quantidadeNum <= 0) {
-      Alert.alert("Atenção", "Preencha a descrição, quantidade e um valor válido para o produto.");
-      return;
-    }
-    const novoItem: Omit<ItemVenda, 'idVenda'> = {
-      id: Crypto.randomUUID(),
-      descricao: itemDescricao.trim(),
-      quantidade: quantidadeNum,
-      valor: valorNum,
-    };
-    setItens(prevItens => [...prevItens, novoItem]);
-    setItemDescricao('');
-    setItemValor('');
-    setItemQuantidade('1');
-  };
+                if (isEditing && idVenda) {
+                    const vendaExistente = await listarVendaPorId(idVenda);
+                    if (vendaExistente) {
+                        setVendaOriginal(vendaExistente);
+                        setItens(vendaExistente.itens || []);
+                        setDesconto(vendaExistente.desconto?.toString().replace('.', ',') || '');
+                        setTipoPagamento(vendaExistente.tipoPagamento);
+                        setDataVenda(new Date(vendaExistente.dataVenda));
+                        if (vendaExistente.tipoPagamento === 'Parcelado') {
+                            setQuantidadeParcelas(vendaExistente.parcelasTotais?.toString() || '2');
+                            setDataPrimeiraParcela(new Date(vendaExistente.dataPrimeiraParcela || Date.now()));
+                        }
+                    } else {
+                        Alert.alert("Erro", "Venda não encontrada para edição.");
+                        router.back();
+                    }
+                }
+            } catch (error) {
+                Alert.alert("Erro", "Não foi possível carregar os dados necessários.");
+            } finally {
+                setIsLoadingData(false);
+            }
+        };
+        carregarDadosIniciais();
+    }, [idVenda, isEditing]);
 
-  const handleRemoverItem = useCallback((id: string) => {
-    setItens(prevItens => prevItens.filter(item => item.id !== id));
-  }, []);
+    const subtotal = itens.reduce((total, item) => total + (item.valor * item.quantidade), 0);
+    const valorDesconto = parseFloat(desconto.replace(',', '.')) || 0;
+    const totalFinal = Math.max(0, subtotal - valorDesconto);
 
-  const handleSalvarVenda = async () => {
-    if (!idCliente) {
-        Alert.alert("Erro Crítico", "A referência do cliente foi perdida.");
-        return;
-    }
-    if (itens.length === 0) {
-      Alert.alert("Atenção", "Adicione pelo menos um produto à venda.");
-      return;
-    }
-    if (valorDesconto > subtotal) {
-      Alert.alert("Erro", "O desconto não pode ser maior que o subtotal da venda.");
-      return;
-    }
-    const quantidadeParcelasNum = parseInt(quantidadeParcelas, 10);
-    if (tipoPagamento === 'Parcelado' && (isNaN(quantidadeParcelasNum) || quantidadeParcelasNum <= 1)) {
-      Alert.alert('Atenção', 'Para pagamento parcelado, a quantidade de parcelas deve ser 2 ou mais.');
-      return;
-    }
-
-    setIsSaving(true);
-    
-    const dadosNovaVenda = {
-      idCliente: idCliente,
-      itens: itens,
-      subtotal: subtotal,
-      valorTotal: totalFinal,
-      dataVenda: dataVenda.toISOString(), // ✨ Usa a data selecionada
-      tipoPagamento,
-      ...(valorDesconto > 0 && { desconto: valorDesconto }),
-      ...(tipoPagamento === 'Parcelado' && {
-        parcelasTotais: quantidadeParcelasNum,
-        parcelasPagas: 0,
-        dataPrimeiraParcela: dataPrimeiraParcela.toISOString(),
-      }),
+    const handleSelecionarProduto = (produto: Produto) => {
+        setItemDescricao(produto.descricao);
+        setItemValor(produto.valor.toString().replace('.', ','));
+        setCatalogoVisivel(false);
     };
 
-    try {
-      await cadastrarVendaSQLite(dadosNovaVenda);
-      Alert.alert('Sucesso', 'Venda cadastrada com sucesso!');
-      router.back();
-    } catch (error) {
-      console.error('Falha ao cadastrar venda (catch na tela):', error);
-      Alert.alert('Erro Inesperado', 'Ocorreu um erro ao cadastrar a venda.');
-    } finally {
-      setIsSaving(false);
+    const handleAdicionarItem = () => {
+        const valorNum = parseFloat(itemValor.replace(',', '.'));
+        const quantidadeNum = parseInt(itemQuantidade, 10);
+        if (!itemDescricao.trim() || isNaN(valorNum) || valorNum <= 0 || isNaN(quantidadeNum) || quantidadeNum <= 0) {
+            Alert.alert("Atenção", "Preencha a descrição, quantidade e um valor válido para o produto.");
+            return;
+        }
+        const novoItem: Omit<ItemVenda, 'idVenda'> = {
+            id: Crypto.randomUUID(),
+            descricao: itemDescricao.trim(),
+            quantidade: quantidadeNum,
+            valor: valorNum,
+        };
+        setItens(prevItens => [...prevItens, novoItem]);
+        setItemDescricao('');
+        setItemValor('');
+        setItemQuantidade('1');
+    };
+
+    const handleRemoverItem = useCallback((id: string) => {
+        setItens(prevItens => prevItens.filter(item => item.id !== id));
+    }, []);
+
+    const handleSalvarVenda = async () => {
+        if (!idCliente) {
+            Alert.alert("Erro Crítico", "A referência do cliente foi perdida.");
+            return;
+        }
+        if (itens.length === 0) {
+            Alert.alert("Atenção", "Adicione pelo menos um produto à venda.");
+            return;
+        }
+        if (valorDesconto > subtotal) {
+            Alert.alert("Erro", "O desconto não pode ser maior que o subtotal da venda.");
+            return;
+        }
+        const quantidadeParcelasNum = parseInt(quantidadeParcelas, 10);
+        if (tipoPagamento === 'Parcelado' && (isNaN(quantidadeParcelasNum) || quantidadeParcelasNum <= 1)) {
+            Alert.alert('Atenção', 'Para pagamento parcelado, a quantidade de parcelas deve ser 2 ou mais.');
+            return;
+        }
+        
+        setIsSaving(true);
+        let sucesso = false;
+        try {
+            if (isEditing && vendaOriginal) {
+                const vendaEditada: Venda = {
+                    ...vendaOriginal,
+                    itens: itens as ItemVenda[],
+                    subtotal: subtotal,
+                    valorTotal: totalFinal,
+                    desconto: valorDesconto > 0 ? valorDesconto : undefined,
+                    tipoPagamento: tipoPagamento,
+                    dataVenda: dataVenda.toISOString(),
+                    parcelasTotais: tipoPagamento === 'Parcelado' ? quantidadeParcelasNum : undefined,
+                    dataPrimeiraParcela: tipoPagamento === 'Parcelado' ? dataPrimeiraParcela.toISOString() : undefined,
+                };
+                sucesso = await editarVenda(vendaEditada);
+            } else {
+                const dadosNovaVenda: Omit<Venda, 'id'> = {
+                    idCliente: idCliente!, clienteNome: clienteNome!, clienteTelefone: clienteTelefone || '',
+                    itens: itens as ItemVenda[], subtotal: subtotal, valorTotal: totalFinal,
+                    dataVenda: dataVenda.toISOString(), tipoPagamento,
+                    ...(valorDesconto > 0 && { desconto: valorDesconto }),
+                    ...(tipoPagamento === 'Parcelado' && {
+                        parcelasTotais: quantidadeParcelasNum, parcelasPagas: 0,
+                        dataPrimeiraParcela: dataPrimeiraParcela.toISOString(),
+                    }),
+                };
+                const vendaCadastrada = await cadastrarVenda(dadosNovaVenda);
+                sucesso = !!vendaCadastrada;
+            }
+
+            if (sucesso) {
+                Alert.alert('Sucesso', `Venda ${isEditing ? 'atualizada' : 'cadastrada'} com sucesso!`);
+                router.back();
+            } else {
+                Alert.alert('Erro', `Não foi possível ${isEditing ? 'atualizar' : 'cadastrar'} a venda.`);
+            }
+        } catch (error) {
+            console.error(`Falha ao ${isEditing ? 'editar' : 'cadastrar'} venda (catch na tela):`, error);
+            Alert.alert('Erro Inesperado', `Ocorreu um erro ao tentar ${isEditing ? 'editar' : 'cadastrar'} a venda.`);
+        } finally {
+            setIsSaving(false);
+        }
+    };
+
+    const onChangeDataVenda = (event: DateTimePickerEvent, selectedDate?: Date) => {
+        setShowDatePickerVenda(Platform.OS === 'ios');
+        if (selectedDate) {
+            setDataVenda(selectedDate);
+        }
+    };
+    const onChangeDataParcela = (event: DateTimePickerEvent, selectedDate?: Date) => {
+        setMostrarDataPickerParcela(Platform.OS === 'ios');
+        if (selectedDate) {
+            setDataPrimeiraParcela(selectedDate);
+        }
+    };
+
+    if (isLoadingData) {
+        return (
+            <ImageBackground source={require("../assets/images/fundo.jpg")} style={styles.background} blurRadius={2}>
+                <View style={styles.overlay} />
+                <View style={styles.loadingContainer}>
+                    <ActivityIndicator size="large" color="#FFFFFF" />
+                    <Text style={styles.loadingText}>A carregar dados...</Text>
+                </View>
+            </ImageBackground>
+        );
     }
-  };
-  
-  // ✨ Funções para os seletores de data
-  const onChangeDataVenda = (event: DateTimePickerEvent, selectedDate?: Date) => {
-      setShowDatePickerVenda(Platform.OS === 'ios');
-      if (selectedDate) {
-          setDataVenda(selectedDate);
-      }
-  };
 
-  const onChangeDataParcela = (event: DateTimePickerEvent, selectedDate?: Date) => {
-      setMostrarDataPickerParcela(Platform.OS === 'ios');
-      if (selectedDate) {
-          setDataPrimeiraParcela(selectedDate);
-      }
-  };
+    return (
+        <ImageBackground source={require("../assets/images/fundo.jpg")} style={styles.background} blurRadius={2}>
+            <View style={styles.overlay} />
+            <SafeAreaView style={styles.safeArea}>
+                <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : "height"} style={styles.keyboardAvoidingContainer}>
+                    <FlatList
+                        data={[]}
+                        keyExtractor={() => 'main-list-container'}
+                        renderItem={null}
+                        contentContainerStyle={styles.scrollContainer}
+                        keyboardShouldPersistTaps="handled"
+                        ListHeaderComponent={
+                            <>
+                                <View style={styles.headerContainer}>
+                                    <TouchableOpacity onPress={() => router.back()} style={styles.backButton}><MaterialCommunityIcons name="arrow-left" size={24} color="#FFFFFF" /></TouchableOpacity>
+                                    <Text style={styles.title}>{isEditing ? 'Editar Venda' : 'Nova Venda'}</Text>
+                                </View>
+                                <Text style={styles.subtitle}>{`para ${clienteNome}`}</Text>
+                                
+                                <View style={styles.sectionContainer}>
+                                    <Text style={styles.sectionTitle}>1. Adicionar Itens</Text>
+                                    
+                                    {catalogoVisivel ? (
+                                        <CatalogoProdutosView
+                                            produtos={catalogoProdutos}
+                                            onSelect={handleSelecionarProduto}
+                                            onClose={() => setCatalogoVisivel(false)}
+                                        />
+                                    ) : (
+                                        <>
+                                            <TouchableOpacity style={styles.selectProductButton} onPress={() => setCatalogoVisivel(true)}>
+                                                <MaterialCommunityIcons name="tag-search-outline" size={22} color="#FFFFFF" />
+                                                <Text style={styles.selectProductButtonText}>Selecionar Produto do Catálogo</Text>
+                                            </TouchableOpacity>
+                                            <Text style={styles.orText}>- ou adicione um item avulso abaixo -</Text>
 
-  return (
-    <ImageBackground source={require("../assets/images/fundo.jpg")} style={styles.background} blurRadius={2}>
-      <View style={styles.overlay} />
-      <SafeAreaView style={styles.safeArea}>
-        <KeyboardAvoidingView
-          behavior={Platform.OS === "ios" ? "padding" : "height"}
-          style={styles.keyboardAvoidingContainer}
-        >
-          <ScrollView contentContainerStyle={styles.scrollContainer} keyboardShouldPersistTaps="handled">
-              <View style={styles.headerContainer}>
-                  <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-                      <MaterialCommunityIcons name="arrow-left" size={24} color="#FFFFFF" />
-                  </TouchableOpacity>
-                  <Text style={styles.title}>Nova Venda</Text>
-              </View>
-              <Text style={styles.subtitle}>{`para ${clienteNome}`}</Text>
-              
-              <View style={styles.sectionContainer}>
-                  <Text style={styles.sectionTitle}>1. Adicionar Itens</Text>
-                  <View style={styles.inputContainer}>
-                      <MaterialCommunityIcons name="tag-outline" size={22} color="#A9A9A9" style={styles.inputIcon} />
-                      <TextInput placeholder="Descrição do Produto" value={itemDescricao} onChangeText={setItemDescricao} placeholderTextColor="#A9A9A9" style={styles.input} />
-                  </View>
-                  <View style={styles.inputRow}>
-                      <View style={[styles.inputContainer, {flex:1}]}><MaterialCommunityIcons name="counter" size={22} color="#A9A9A9" style={styles.inputIcon} /><TextInput placeholder="Qtde." value={itemQuantidade} onChangeText={setItemQuantidade} keyboardType="number-pad" placeholderTextColor="#A9A9A9" style={styles.input} /></View>
-                      <View style={[styles.inputContainer, {flex:2}]}><MaterialCommunityIcons name="cash" size={22} color="#A9A9A9" style={styles.inputIcon} /><TextInput placeholder="Valor (un.)" value={itemValor} onChangeText={setItemValor} keyboardType="decimal-pad" placeholderTextColor="#A9A9A9" style={styles.input} /></View>
-                  </View>
-                  <TouchableOpacity style={[styles.actionButton, styles.additemButton]} onPress={handleAdicionarItem}>
-                      <MaterialCommunityIcons name="plus-circle-outline" size={22} color="#FFFFFF" />
-                      <Text style={styles.actionButtonText}>Adicionar Produto</Text>
-                  </TouchableOpacity>
-              </View>
+                                            <View style={styles.inputContainer}>
+                                                <MaterialCommunityIcons name="tag-outline" size={22} color="#A9A9A9" style={styles.inputIcon} />
+                                                <TextInput placeholder="Descrição do Produto Avulso" value={itemDescricao} onChangeText={setItemDescricao} placeholderTextColor="#A9A9A9" style={styles.input} />
+                                            </View>
+                                            <View style={styles.inputRow}>
+                                                <View style={[styles.inputContainer, {flex:1}]}><MaterialCommunityIcons name="counter" size={22} color="#A9A9A9" style={styles.inputIcon} /><TextInput placeholder="Qtde." value={itemQuantidade} onChangeText={setItemQuantidade} keyboardType="number-pad" placeholderTextColor="#A9A9A9" style={styles.input} /></View>
+                                                <View style={[styles.inputContainer, {flex:2}]}><MaterialCommunityIcons name="cash" size={22} color="#A9A9A9" style={styles.inputIcon} /><TextInput placeholder="Valor (un.)" value={itemValor} onChangeText={setItemValor} keyboardType="decimal-pad" placeholderTextColor="#A9A9A9" style={styles.input} /></View>
+                                            </View>
+                                        </>
+                                    )}
+                                    
+                                    <TouchableOpacity style={[styles.actionButton, styles.additemButton]} onPress={handleAdicionarItem}>
+                                        <MaterialCommunityIcons name="plus-circle-outline" size={22} color="#FFFFFF" />
+                                        <Text style={styles.actionButtonText}>Adicionar Item</Text>
+                                    </TouchableOpacity>
+                                </View>
 
-              <View style={styles.sectionContainer}>
-                  <Text style={styles.sectionTitle}>2. Resumo e Pagamento</Text>
+                                <View style={styles.sectionContainer}>
+                                    <Text style={styles.sectionTitle}>2. Resumo e Pagamento</Text>
+                                    <View style={styles.dateSelectorContainer}>
+                                        <Text style={styles.dateSelectorLabel}>Data da Venda:</Text>
+                                        <TouchableOpacity style={styles.datePickerButton} onPress={() => setShowDatePickerVenda(true)}>
+                                            <MaterialCommunityIcons name="calendar" size={22} color="#A9A9A9" />
+                                            <Text style={styles.datePickerText}>{dataVenda.toLocaleDateString('pt-BR')}</Text>
+                                        </TouchableOpacity>
+                                    </View>
+                                    {showDatePickerVenda && (<DateTimePicker value={dataVenda} mode="date" display="default" onChange={onChangeDataVenda} />)}
 
-                  {/* ✨ Seletor de Data da Venda Adicionado */}
-                  <View style={styles.dateSelectorContainer}>
-                      <Text style={styles.dateSelectorLabel}>Data da Venda:</Text>
-                      <TouchableOpacity style={styles.datePickerButton} onPress={() => setShowDatePickerVenda(true)}>
-                          <MaterialCommunityIcons name="calendar" size={22} color="#A9A9A9" />
-                          <Text style={styles.datePickerText}>{dataVenda.toLocaleDateString('pt-BR')}</Text>
-                      </TouchableOpacity>
-                  </View>
-                  {showDatePickerVenda && (
-                      <DateTimePicker value={dataVenda} mode="date" display="default" onChange={onChangeDataVenda} />
-                  )}
+                                    {itens.length === 0 ? (<Text style={styles.emptyListText}>Nenhum item adicionado ainda.</Text>) : (<>
+                                        {itens.map(item => (<MemoizedItemAdicionado key={item.id} item={item} onRemove={handleRemoverItem} />))}
+                                        <View style={styles.resumoContainer}>
+                                            <View style={styles.resumoRow}><Text style={styles.textoResumo}>Subtotal:</Text><Text style={styles.textoResumo}>{`R$ ${subtotal.toFixed(2)}`}</Text></View>
+                                            <View style={[styles.resumoRow, styles.descontoInputContainer]}><Text style={styles.textoResumo}>Desconto:</Text><View style={styles.inputDescontoWrapper}><Text style={styles.inputDescontoPrefix}>R$</Text><TextInput placeholder="0,00" placeholderTextColor="#A9A9A9" value={desconto} onChangeText={setDesconto} keyboardType="decimal-pad" style={styles.inputDesconto} /></View></View>
+                                            <View style={[styles.resumoRow, styles.totalRow]}><Text style={styles.textoTotalFinal}>Total:</Text><Text style={styles.textoTotalFinal}>{`R$ ${totalFinal.toFixed(2)}`}</Text></View>
+                                        </View>
+                                        <View style={styles.pagamentoSectionContainer}>
+                                            <Text style={styles.subSectionTitle}>Forma de Pagamento</Text>
+                                            <View style={styles.pagamentoContainer}><TouchableOpacity style={[styles.pagamentoBotao, tipoPagamento === 'À Vista' && styles.pagamentoSelecionado]} onPress={() => setTipoPagamento('À Vista')}><MaterialCommunityIcons name="cash" size={24} color={tipoPagamento === 'À Vista' ? "#FFF" : "#A9A9A9"} /><Text style={styles.textoBotaoPagamento}>À Vista</Text></TouchableOpacity><TouchableOpacity style={[styles.pagamentoBotao, tipoPagamento === 'Parcelado' && styles.pagamentoSelecionado]} onPress={() => setTipoPagamento('Parcelado')}><MaterialCommunityIcons name="credit-card-multiple-outline" size={24} color={tipoPagamento === 'Parcelado' ? "#FFF" : "#A9A9A9"} /><Text style={styles.textoBotaoPagamento}>Parcelado</Text></TouchableOpacity></View>
+                                            {tipoPagamento === 'Parcelado' && (<View style={styles.parceladoContainer}><View style={[styles.inputContainer, {flex:1}]}><MaterialCommunityIcons name="format-list-numbered" size={22} color="#A9A9A9" style={styles.inputIcon} /><TextInput placeholder="Nº Parc." value={quantidadeParcelas} onChangeText={setQuantidadeParcelas} keyboardType="number-pad" style={styles.input} placeholderTextColor="#A9A9A9" /></View><TouchableOpacity style={[styles.inputContainer, {flex: 2, alignItems: 'center'}]} onPress={() => setMostrarDataPickerParcela(true)}><MaterialCommunityIcons name="calendar-range" size={22} color="#A9A9A9" style={styles.inputIcon} /><Text style={styles.dateInputText}>{dataPrimeiraParcela.toLocaleDateString('pt-BR')}</Text></TouchableOpacity>{mostrarDataPickerParcela && (<DateTimePicker value={dataPrimeiraParcela} mode="date" display="default" onChange={onChangeDataParcela} />)}</View>)}
+                                        </View>
+                                    </>
+                                    )}
+                                </View>
 
-                  {itens.length === 0 ? (
-                      <Text style={styles.emptyListText}>Nenhum item adicionado ainda.</Text>
-                  ) : (
-                      <>
-                          {itens.map(item => (<MemoizedItemAdicionado key={item.id} item={item} onRemove={handleRemoverItem} />))}
-                          <View style={styles.resumoContainer}>
-                              <View style={styles.resumoRow}><Text style={styles.textoResumo}>Subtotal:</Text><Text style={styles.textoResumo}>{`R$ ${subtotal.toFixed(2)}`}</Text></View>
-                              <View style={[styles.resumoRow, styles.descontoInputContainer]}><Text style={styles.textoResumo}>Desconto:</Text><View style={styles.inputDescontoWrapper}><Text style={styles.inputDescontoPrefix}>R$</Text><TextInput placeholder="0,00" placeholderTextColor="#A9A9A9" value={desconto} onChangeText={setDesconto} keyboardType="decimal-pad" style={styles.inputDesconto} /></View></View>
-                              <View style={[styles.resumoRow, styles.totalRow]}><Text style={styles.textoTotalFinal}>Total:</Text><Text style={styles.textoTotalFinal}>{`R$ ${totalFinal.toFixed(2)}`}</Text></View>
-                          </View>
-                          <View style={styles.pagamentoSectionContainer}>
-                              <Text style={styles.subSectionTitle}>Forma de Pagamento</Text>
-                              <View style={styles.pagamentoContainer}><TouchableOpacity style={[styles.pagamentoBotao, tipoPagamento === 'À Vista' && styles.pagamentoSelecionado]} onPress={() => setTipoPagamento('À Vista')}><MaterialCommunityIcons name="cash" size={24} color={tipoPagamento === 'À Vista' ? "#FFF" : "#A9A9A9"} /><Text style={styles.textoBotaoPagamento}>À Vista</Text></TouchableOpacity><TouchableOpacity style={[styles.pagamentoBotao, tipoPagamento === 'Parcelado' && styles.pagamentoSelecionado]} onPress={() => setTipoPagamento('Parcelado')}><MaterialCommunityIcons name="credit-card-multiple-outline" size={24} color={tipoPagamento === 'Parcelado' ? "#FFF" : "#A9A9A9"} /><Text style={styles.textoBotaoPagamento}>Parcelado</Text></TouchableOpacity></View>
-                              {tipoPagamento === 'Parcelado' && (<View style={styles.parceladoContainer}><View style={[styles.inputContainer, {flex:1}]}><MaterialCommunityIcons name="format-list-numbered" size={22} color="#A9A9A9" style={styles.inputIcon} /><TextInput placeholder="Nº Parc." value={quantidadeParcelas} onChangeText={setQuantidadeParcelas} keyboardType="number-pad" style={styles.input} placeholderTextColor="#A9A9A9" /></View><TouchableOpacity style={[styles.inputContainer, {flex: 2, alignItems: 'center'}]} onPress={() => setMostrarDataPickerParcela(true)}><MaterialCommunityIcons name="calendar-range" size={22} color="#A9A9A9" style={styles.inputIcon} /><Text style={styles.dateInputText}>{dataPrimeiraParcela.toLocaleDateString('pt-BR')}</Text></TouchableOpacity>{mostrarDataPickerParcela && (<DateTimePicker value={dataPrimeiraParcela} mode="date" display="default" onChange={onChangeDataParcela} />)}</View>)}
-                          </View>
-                      </>
-                  )}
-              </View>
-
-            <View style={styles.actionButtonsContainer}>
-                {isSaving ? (
-                    <ActivityIndicator size="large" color="#FFFFFF" style={styles.loader} />
-                ) : (
-                    <TouchableOpacity style={[styles.actionButton, styles.saveButton, itens.length === 0 && styles.disabledButton]} onPress={handleSalvarVenda} disabled={itens.length === 0 || isSaving}>
-                        <MaterialCommunityIcons name="content-save-check-outline" size={22} color="#FFFFFF" />
-                        <Text style={styles.actionButtonText}>Concluir e Salvar Venda</Text>
-                    </TouchableOpacity>
-                )}
-            </View>
-          </ScrollView>
-        </KeyboardAvoidingView>
-      </SafeAreaView>
-    </ImageBackground>
-  );
+                                <View style={styles.actionButtonsContainer}>
+                                    {isSaving ? ( <ActivityIndicator size="large" color="#FFFFFF" style={styles.loader} /> ) : (
+                                        <TouchableOpacity style={[styles.actionButton, styles.saveButton, itens.length === 0 && styles.disabledButton]} onPress={handleSalvarVenda} disabled={itens.length === 0 || isSaving}>
+                                            <MaterialCommunityIcons name="content-save-check-outline" size={22} color="#FFFFFF" />
+                                            <Text style={styles.actionButtonText}>{isEditing ? 'Atualizar Venda' : 'Salvar Venda'}</Text>
+                                        </TouchableOpacity>
+                                    )}
+                                </View>
+                            </>
+                        }
+                    />
+                </KeyboardAvoidingView>
+            </SafeAreaView>
+        </ImageBackground>
+    );
 }
 
 const styles = StyleSheet.create({
@@ -277,35 +370,47 @@ const styles = StyleSheet.create({
     saveButton: { backgroundColor: '#4CAF50' },
     loader: { marginVertical: 15 },
     disabledButton: { backgroundColor: '#555', opacity: 0.7 },
-    // ✨ NOVOS ESTILOS
-    dateSelectorContainer: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        marginBottom: 20,
-        paddingHorizontal: 5,
-        borderBottomWidth: 1,
-        borderBottomColor: 'rgba(255,255,255,0.2)',
-        paddingBottom: 20,
+    dateSelectorContainer: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20, paddingHorizontal: 5, borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.2)', paddingBottom: 20 },
+    dateSelectorLabel: { fontSize: 16, color: '#E0E0FF', fontWeight: '500' },
+    datePickerButton: { flexDirection: 'row', alignItems: 'center', backgroundColor: 'rgba(0, 0, 0, 0.25)', borderRadius: 12, paddingVertical: 10, paddingHorizontal: 15, borderWidth: 1, borderColor: 'rgba(255, 255, 255, 0.2)' },
+    datePickerText: { color: '#FFFFFF', fontSize: 16, marginLeft: 10 },
+    selectProductButton: { backgroundColor: '#673AB7', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', padding: 14, borderRadius: 25, marginBottom: 10 },
+    selectProductButtonText: { color: 'white', fontSize: 16, fontWeight: 'bold', marginLeft: 10 },
+    orText: { color: 'rgba(255,255,255,0.6)', textAlign: 'center', marginBottom: 20, fontStyle: 'italic' },
+    loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
+    loadingText: { color: 'white', marginTop: 10 },
+    catalogoContainer: {
+        backgroundColor: 'rgba(0, 0, 0, 0.2)',
+        borderRadius: 16,
+        padding: 15,
+        marginBottom: 15,
     },
-    dateSelectorLabel: {
-        fontSize: 16,
-        color: '#E0E0FF',
-        fontWeight: '500',
-    },
-    datePickerButton: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        backgroundColor: 'rgba(0, 0, 0, 0.25)',
-        borderRadius: 12,
-        paddingVertical: 10,
-        paddingHorizontal: 15,
-        borderWidth: 1,
-        borderColor: 'rgba(255, 255, 255, 0.2)',
-    },
-    datePickerText: {
+    catalogoTitle: {
+        fontSize: 18,
+        fontWeight: 'bold',
         color: '#FFFFFF',
-        fontSize: 16,
-        marginLeft: 10,
+        marginBottom: 15,
+        textAlign: 'center',
+    },
+    productListItem: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        paddingVertical: 15,
+        borderBottomWidth: 1,
+        borderBottomColor: 'rgba(255,255,255,0.1)'
+    },
+    productListItemDesc: { color: '#FFFFFF', fontSize: 16 },
+    productListItemValue: { color: '#E0E0E0', fontSize: 16 },
+    catalogoButton: {
+        padding: 14,
+        borderRadius: 12,
+        alignItems: 'center',
+        marginTop: 15
+    },
+    cancelButton: { backgroundColor: '#757575' },
+    catalogoButtonText: {
+        color: '#FFFFFF',
+        fontWeight: 'bold',
+        fontSize: 16
     },
 });

@@ -58,7 +58,6 @@ export default function RootLayout() {
   // Se a aplicação está pronta, renderiza a navegação principal.
   return (
     <Stack screenOptions={{ headerShown: false }}>
-      {/* ✨ CORREÇÃO: Os nomes agora correspondem exatamente aos seus arquivos */}
       <Stack.Screen name="index" />
       <Stack.Screen name="Home" />
       <Stack.Screen name="Clientes" />
@@ -70,7 +69,8 @@ export default function RootLayout() {
       <Stack.Screen name="Pesquisarvendascliente" />
       <Stack.Screen name="Todasvendas" />
       <Stack.Screen name="Vendascliente" /> 
-      <Stack.Screen name="Vendasporclientes" /> 
+      <Stack.Screen name="Vendasporclientes" />
+      <Stack.Screen name="Produtos" />
     </Stack>
   );
 }

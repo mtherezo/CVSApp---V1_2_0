@@ -15,16 +15,6 @@ export interface Cliente {
   endereco?: string;
 }
 
-export interface Produto {
-  id: string;
-  nome: string;
-  tipo: string;
-  marca?: string; 
-  quantidade: number;
-  preco: number;
-  precovenda: number;
-}
-
 export interface Pagamento {
   id: string;
   idVenda: string; 
@@ -55,4 +45,10 @@ export interface Venda {
 export interface Usuario {
   username: string;
   passwordHash: string;
+}
+
+export interface Produto {
+  id: string;
+  descricao: string;
+  valor: number;
 }
