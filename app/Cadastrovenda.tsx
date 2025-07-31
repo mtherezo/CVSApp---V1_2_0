@@ -2,7 +2,7 @@
 import React, { useState, useCallback, useEffect } from 'react';
 import {
     View, Text, TextInput, TouchableOpacity, StyleSheet, Alert, ImageBackground,
-    Platform, KeyboardAvoidingView, ActivityIndicator, SafeAreaView, StatusBar, FlatList
+    Platform, KeyboardAvoidingView, ActivityIndicator, ScrollView, SafeAreaView, StatusBar, FlatList
 } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { cadastrarVenda, editarVenda, listarVendaPorId } from '../src/storage/vendasStorage';
@@ -28,27 +28,63 @@ const MemoizedItemAdicionado = React.memo(({ item, onRemove }: { item: Omit<Item
     );
 });
 
-// Componente para a visão do Catálogo de Produtos (sem alterações)
-const CatalogoProdutosView = ({ produtos, onSelect, onClose }: { produtos: Produto[], onSelect: (produto: Produto) => void, onClose: () => void }) => (
-    <View style={styles.catalogoContainer}>
-        <Text style={styles.catalogoTitle}>Selecione um Produto</Text>
-        <FlatList
-            data={produtos}
-            keyExtractor={(item) => item.id}
-            renderItem={({ item }) => (
-                <TouchableOpacity style={styles.productListItem} onPress={() => onSelect(item)}>
-                    <Text style={styles.productListItemDesc}>{item.descricao}</Text>
-                    <Text style={styles.productListItemValue}>{`R$ ${item.valor.toFixed(2)}`}</Text>
-                </TouchableOpacity>
-            )}
-            ListEmptyComponent={<Text style={styles.emptyListText}>Nenhum produto no catálogo. Adicione na tela de "Catálogo".</Text>}
-            style={{ maxHeight: 250 }}
-        />
-        <TouchableOpacity style={[styles.catalogoButton, styles.cancelButton]} onPress={onClose}>
-            <Text style={styles.catalogoButtonText}>Fechar Catálogo</Text>
-        </TouchableOpacity>
-    </View>
-);
+// ✨ ALTERADO: O componente do catálogo agora tem lógica de busca interna
+const CatalogoProdutosView = ({ produtos, onSelect, onClose }: { produtos: Produto[], onSelect: (produto: Produto) => void, onClose: () => void }) => {
+    // Estado para o termo da busca e para a lista filtrada
+    const [termoBusca, setTermoBusca] = useState('');
+    const [produtosFiltrados, setProdutosFiltrados] = useState(produtos);
+
+    // Efeito que filtra os produtos sempre que o termo de busca muda
+    useEffect(() => {
+        if (termoBusca.trim() === '') {
+            setProdutosFiltrados(produtos); // Se a busca estiver vazia, mostra todos
+        } else {
+            const filtrados = produtos.filter(produto =>
+                produto.descricao.toLowerCase().startsWith(termoBusca.toLowerCase())
+            );
+            setProdutosFiltrados(filtrados); // Mostra os produtos filtrados
+        }
+    }, [termoBusca, produtos]);
+
+    return (
+        <View style={styles.catalogoContainer}>
+            <Text style={styles.catalogoTitle}>Selecione um Produto</Text>
+            
+            {/* ✨ NOVO: Campo de busca adicionado */}
+            <View style={styles.buscaContainer}>
+                <MaterialCommunityIcons name="magnify" size={22} color="#A9A9A9" style={styles.buscaIcon} />
+                <TextInput
+                    style={styles.buscaInput}
+                    placeholder="Buscar produto por nome..."
+                    placeholderTextColor="#A9A9A9"
+                    value={termoBusca}
+                    onChangeText={setTermoBusca}
+                />
+            </View>
+
+            <FlatList
+                data={produtosFiltrados} // ✨ ALTERADO: Usa a lista filtrada
+                keyExtractor={(item) => item.id}
+                renderItem={({ item }) => (
+                    <TouchableOpacity style={styles.productListItem} onPress={() => onSelect(item)}>
+                        <Text style={styles.productListItemDesc}>{item.descricao}</Text>
+                        <Text style={styles.productListItemValue}>{`R$ ${item.valor.toFixed(2)}`}</Text>
+                    </TouchableOpacity>
+                )}
+                ListEmptyComponent={
+                    <Text style={styles.emptyListText}>
+                        {termoBusca ? 'Nenhum produto encontrado.' : 'Nenhum produto no catálogo.'}
+                    </Text>
+                }
+                style={{ maxHeight: 250 }}
+                keyboardShouldPersistTaps="handled"
+            />
+            <TouchableOpacity style={[styles.catalogoButton, styles.cancelButton]} onPress={onClose}>
+                <Text style={styles.catalogoButtonText}>Fechar Catálogo</Text>
+            </TouchableOpacity>
+        </View>
+    );
+};
 
 
 export default function CadastroVendaScreen() {
@@ -58,6 +94,7 @@ export default function CadastroVendaScreen() {
 
     const [catalogoProdutos, setCatalogoProdutos] = useState<Produto[]>([]);
     const [catalogoVisivel, setCatalogoVisivel] = useState(false);
+
     const [itens, setItens] = useState<Omit<ItemVenda, 'idVenda'>[]>([]);
     const [itemDescricao, setItemDescricao] = useState('');
     const [itemValor, setItemValor] = useState('');
@@ -208,6 +245,7 @@ export default function CadastroVendaScreen() {
             setDataVenda(selectedDate);
         }
     };
+    
     const onChangeDataParcela = (event: DateTimePickerEvent, selectedDate?: Date) => {
         setMostrarDataPickerParcela(Platform.OS === 'ios');
         if (selectedDate) {
@@ -234,7 +272,7 @@ export default function CadastroVendaScreen() {
                 <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : "height"} style={styles.keyboardAvoidingContainer}>
                     <FlatList
                         data={[]}
-                        keyExtractor={() => 'main-list-container'}
+                        keyExtractor={() => 'main-list'}
                         renderItem={null}
                         contentContainerStyle={styles.scrollContainer}
                         keyboardShouldPersistTaps="handled"
@@ -274,7 +312,7 @@ export default function CadastroVendaScreen() {
                                         </>
                                     )}
                                     
-                                    <TouchableOpacity style={[styles.actionButton, styles.additemButton]} onPress={handleAdicionarItem}>
+                                    <TouchableOpacity style={[styles.actionButton, styles.additemButton]} onPress={handleAdicionarItem} disabled={catalogoVisivel}>
                                         <MaterialCommunityIcons name="plus-circle-outline" size={22} color="#FFFFFF" />
                                         <Text style={styles.actionButtonText}>Adicionar Item</Text>
                                     </TouchableOpacity>
@@ -282,6 +320,7 @@ export default function CadastroVendaScreen() {
 
                                 <View style={styles.sectionContainer}>
                                     <Text style={styles.sectionTitle}>2. Resumo e Pagamento</Text>
+                                    
                                     <View style={styles.dateSelectorContainer}>
                                         <Text style={styles.dateSelectorLabel}>Data da Venda:</Text>
                                         <TouchableOpacity style={styles.datePickerButton} onPress={() => setShowDatePickerVenda(true)}>
@@ -412,5 +451,25 @@ const styles = StyleSheet.create({
         color: '#FFFFFF',
         fontWeight: 'bold',
         fontSize: 16
+    },
+    // ✨ NOVO: Estilos para o campo de busca no catálogo
+    buscaContainer: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: 'rgba(0, 0, 0, 0.25)',
+        borderRadius: 12,
+        borderWidth: 1,
+        borderColor: 'rgba(255, 255, 255, 0.2)',
+        paddingHorizontal: 10,
+        marginBottom: 15,
+    },
+    buscaIcon: {
+        marginRight: 8,
+    },
+    buscaInput: {
+        flex: 1,
+        paddingVertical: 12,
+        fontSize: 16,
+        color: '#FFFFFF',
     },
 });

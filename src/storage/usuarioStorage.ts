@@ -1,77 +1,98 @@
-import * as SecureStore from "expo-secure-store";
+// src/storage/usuarioStorage.ts
+import * as SecureStore from 'expo-secure-store';
+import { Usuario } from '../types'; // ✨ Importa o tipo 'Usuario'
 
-// Chave única para armazenar a lista de usuários no SecureStore.
-const USER_KEY = "user_data";
+// Chave única e padronizada para armazenar os dados do usuário.
+const USER_KEY = "user_data_v2";
 
 /**
- * Salva uma lista completa de usuários, substituindo qualquer lista existente.
- * @param usuarios O array de usuários a ser salvo.
- * @returns Uma Promise que resolve para 'true' se os dados forem salvos com sucesso, e 'false' caso contrário.
+ * Obtém todos os usuários salvos no armazenamento seguro.
+ * @returns Uma Promise que resolve para um array de Usuários. Retorna um array vazio se não houver usuários ou em caso de erro.
  */
-export async function salvarTodosUsuarios(usuarios: any[]): Promise<boolean> {
+export async function obterTodosUsuarios(): Promise<Usuario[]> {
   try {
-    // Converte o array de usuários para uma string JSON.
-    const dados = JSON.stringify(usuarios);
-    // Salva a string no SecureStore.
-    await SecureStore.setItemAsync(USER_KEY, dados);
-    return true; // Sucesso
+    const dados = await SecureStore.getItemAsync(USER_KEY);
+    // ✨ Usa o tipo Usuario[] para garantir a segurança dos dados.
+    return dados ? JSON.parse(dados) : [];
   } catch (error) {
-    // Exibe um erro no console se algo der errado.
-    console.error("Erro ao salvar todos os usuários:", error);
-    return false; // Falha
+    console.error("Erro ao obter todos os usuários:", error);
+    return [];
   }
 }
 
 /**
- * Obtém todos os usuários salvos no armazenamento seguro.
- * @returns Uma Promise que resolve para um array de usuários. Retorna um array vazio se não houver usuários ou em caso de erro.
+ * Salva uma lista completa de usuários, substituindo qualquer lista existente.
+ * Usado principalmente para inicialização ou restauração.
+ * @param usuarios O array de Usuários a ser salvo.
+ * @returns Uma Promise que resolve para 'true' em caso de sucesso. Lança um erro em caso de falha.
  */
-export async function obterTodosUsuarios(): Promise<any[]> {
+export async function salvarTodosUsuarios(usuarios: Usuario[]): Promise<boolean> {
   try {
-    // Tenta obter os dados do SecureStore.
-    const dados = await SecureStore.getItemAsync(USER_KEY);
-
-    // Se não houver dados, retorna um array vazio.
-    if (!dados) {
-      return [];
-    }
-
-    // Analisa a string JSON para obter a lista de usuários.
-    return JSON.parse(dados);
+    const dados = JSON.stringify(usuarios);
+    await SecureStore.setItemAsync(USER_KEY, dados);
+    return true;
   } catch (error) {
-    // Exibe um erro no console se algo der errado.
-    console.error("Erro ao obter todos os usuários:", error);
-    // Retorna um array vazio para garantir que a aplicação não quebre.
-    return [];
+    console.error("Erro ao salvar todos os usuários:", error);
+    throw new Error("Não foi possível salvar os dados dos usuários.");
   }
+}
+
+/**
+ * ✨ NOVA FUNÇÃO: Adiciona um novo usuário ou atualiza um existente.
+ * Esta é uma forma mais segura e eficiente de gerenciar usuários individualmente.
+ * @param usuario O objeto de usuário a ser adicionado ou atualizado.
+ * @returns Uma Promise que resolve para 'true' em caso de sucesso. Lança um erro em caso de falha.
+ */
+export async function adicionarOuAtualizarUsuario(usuario: Usuario): Promise<boolean> {
+    try {
+        const usuariosAtuais = await obterTodosUsuarios();
+        
+        // Verifica se o usuário já existe na lista
+        const indexExistente = usuariosAtuais.findIndex(u => u.username.toLowerCase() === usuario.username.toLowerCase());
+
+        if (indexExistente >= 0) {
+            // Se existe, atualiza os dados do usuário naquela posição.
+            usuariosAtuais[indexExistente] = usuario;
+        } else {
+            // Se não existe, adiciona o novo usuário à lista.
+            usuariosAtuais.push(usuario);
+        }
+
+        // Salva a lista atualizada de volta no SecureStore.
+        await salvarTodosUsuarios(usuariosAtuais);
+        return true;
+
+    } catch (error) {
+        console.error(`Erro ao adicionar/atualizar o usuário ${usuario.username}:`, error);
+        throw new Error("Não foi possível salvar o usuário.");
+    }
 }
 
 
 /**
  * Exclui um usuário da lista com base no seu nome de usuário.
- * @param username O nome do usuário a ser excluído.
- * @returns Uma Promise que resolve para 'true' se a exclusão for bem-sucedida, e 'false' caso contrário.
+ * @param username O nome do usuário a ser excluído (case-insensitive).
+ * @returns Uma Promise que resolve para 'true' em caso de sucesso. Lança um erro em caso de falha.
  */
 export async function excluirUsuario(username: string): Promise<boolean> {
   try {
-    // Obtém a lista atual de usuários.
     const usuariosAtuais = await obterTodosUsuarios();
+    
+    // Filtra a lista, garantindo que a comparação seja case-insensitive.
+    const novaLista = usuariosAtuais.filter(
+      u => u.username.toLowerCase() !== username.toLowerCase()
+    );
 
-    // Se não houver usuários, não há nada a excluir.
-    if (usuariosAtuais.length === 0) {
-      return false;
+    // Verifica se algum usuário foi de fato removido
+    if (novaLista.length === usuariosAtuais.length) {
+        console.warn(`Tentativa de excluir um usuário não existente: ${username}`);
+        return false; // Retorna false se o usuário não foi encontrado
     }
 
-    // Filtra a lista, mantendo apenas os usuários cujo username é diferente do fornecido.
-    const novaLista = usuariosAtuais.filter((u: any) => u.username !== username);
-
-    // Salva a nova lista (sem o usuário excluído) de volta no SecureStore.
-    await SecureStore.setItemAsync(USER_KEY, JSON.stringify(novaLista));
-    
-    return true; // Sucesso
+    await salvarTodosUsuarios(novaLista);
+    return true;
   } catch (error) {
-    // Exibe um erro no console se algo der errado.
-    console.error("Erro ao excluir usuário:", error);
-    return false; // Falha
+    console.error(`Erro ao excluir o usuário ${username}:`, error);
+    throw new Error("Não foi possível excluir o usuário.");
   }
 }
