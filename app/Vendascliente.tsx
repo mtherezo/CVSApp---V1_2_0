@@ -1,25 +1,15 @@
-// Tela de Vendas do Cliente (Vendascliente.tsx)
-import React, { useState, useCallback } from 'react';
+//Vendascliente.tsx
+import React, { useState, useCallback, useMemo } from 'react';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import {
-    View,
-    Text,
-    FlatList,
-    StyleSheet,
-    TouchableOpacity,
-    Alert,
-    ImageBackground,
-    ActivityIndicator,
-    RefreshControl,
-    Platform,
-    SafeAreaView,
-    StatusBar,
-} from 'react-native';
+import { View, Text, FlatList, StyleSheet, TouchableOpacity, Alert, ImageBackground, ActivityIndicator, RefreshControl, Platform, SafeAreaView, StatusBar,} from 'react-native';
 import { useRouter, useLocalSearchParams, useFocusEffect } from 'expo-router';
 import { listarVendasPorClienteSQLite, excluirVendaSQLite } from '../src/database/sqlite';
 import { Venda } from '../src/types'; 
 import EnviarLembreteWhatsAppButton from '../src/components/EnviarLembreteWhatsAppButton';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
+
+// Define os tipos de filtro possíveis
+type FiltroStatus = 'todas' | 'pendentes' | 'parciais' | 'quitadas';
 
 export default function VendasClienteScreen() {
     const params = useLocalSearchParams<{ idCliente?: string; nome?: string; telefone?: string }>();
@@ -31,6 +21,10 @@ export default function VendasClienteScreen() {
     const [isLoading, setIsLoading] = useState(true);
     const [isDeleting, setIsDeleting] = useState<string | null>(null); 
     const [refreshing, setRefreshing] = useState(false);
+    
+    // Adiciona o estado para controlar o filtro ativo
+    const [filtroAtivo, setFiltroAtivo] = useState<FiltroStatus>('todas');
+
     const router = useRouter();
     const insets = useSafeAreaInsets();
 
@@ -99,6 +93,22 @@ export default function VendasClienteScreen() {
         return venda.pagamentos?.reduce((acc, p) => acc + p.valorPago, 0) || 0;
     };
 
+    const vendasFiltradas = useMemo(() => {
+        if (filtroAtivo === 'todas') {
+            return vendas;
+        }
+        return vendas.filter(venda => {
+            const valorPago = calcularValorPago(venda);
+            const saldoDevedor = venda.valorTotal - valorPago;
+
+            if (filtroAtivo === 'pendentes') return valorPago === 0;
+            if (filtroAtivo === 'parciais') return valorPago > 0 && saldoDevedor > 0.001;
+            if (filtroAtivo === 'quitadas') return saldoDevedor <= 0.001;
+            
+            return false;
+        });
+    }, [vendas, filtroAtivo]);
+
     const renderItemVenda = ({ item }: { item: Venda }) => {
         const valorPago = calcularValorPago(item);
         const saldoDevedorItem = item.valorTotal - valorPago;
@@ -141,20 +151,16 @@ export default function VendasClienteScreen() {
                 </View>
 
                 <View style={styles.detalhesFinanceiros}>
-                    {item.desconto && item.desconto > 0 && (
+                    {item.desconto && item.desconto > 0 ? (
                         <>
                             <Text style={styles.valorLabel}>Subtotal:</Text>
                             <Text style={styles.valorMontante}>R$ {item.subtotal.toFixed(2)}</Text>
-                        </>
-                    )}
-
-                    {item.desconto && item.desconto > 0 && (
-                        <>
                             <Text style={styles.valorLabel}>Desconto:</Text>
                             <Text style={[styles.valorMontante, styles.textoDesconto]}>- R$ {item.desconto.toFixed(2)}</Text>
                         </>
-                    )}
+                    ) : null}
 
+                    
                     <Text style={[styles.valorLabel, styles.labelTotalFinal]}>Total:</Text>
                     <Text style={[styles.valorMontante, styles.textoTotalFinal]}>R$ {item.valorTotal.toFixed(2)}</Text>
                     
@@ -188,36 +194,52 @@ export default function VendasClienteScreen() {
                     )}
                     
                     <TouchableOpacity style={[styles.botaoCard, styles.botaoDetalhes]} onPress={() => router.push({ pathname: './Parcelasvendacliente', params: { idVenda: item.id } })}>
-                        <MaterialCommunityIcons name="cash-multiple" size={20} color="#FFFFFF" />
-                        <Text style={styles.textoBotaoCard}>Pagar</Text>
+                        <MaterialCommunityIcons name="cash-multiple" size={30} color="#FFFFFF" />
                     </TouchableOpacity>
-                    
-                    {/* BOTÃO DE EDITAR */}
-                    <TouchableOpacity 
-                        style={[styles.botaoCard, styles.botaoEditar]} 
-                        onPress={() => router.push({ 
-                            pathname: '/Cadastrovenda', 
-                            params: { 
-                                idVenda: item.id,
-                                idCliente: idCliente,
-                                nome: nomeCliente,
-                                telefone: telefoneCliente,
-                            } 
-                        })}
-                    >
-                        <MaterialCommunityIcons name="pencil-outline" size={20} color="#FFFFFF" />
-                        <Text style={styles.textoBotaoCard}></Text>
+
+                    <TouchableOpacity style={[styles.botaoCard, styles.botaoEditar]} onPress={() => router.push({ pathname: '/Cadastrovenda', params: { idVenda: item.id, idCliente: idCliente, nome: nomeCliente, telefone: telefoneCliente, } })}>
+                        <MaterialCommunityIcons name="pencil-outline" size={30} color="#FFFFFF" />
                     </TouchableOpacity>
+                                            
                     <TouchableOpacity style={[styles.botaoCard, styles.botaoExcluir, isDeleting === item.id && styles.disabledButton]} onPress={() => confirmarExclusaoVenda(item)} disabled={isDeleting === item.id}>
                         {isDeleting === item.id ? 
                             <ActivityIndicator size="small" color="#FFFFFF" /> : 
-                            <MaterialCommunityIcons name="delete-outline" size={20} color="#FFFFFF" />
+                            <MaterialCommunityIcons name="delete-outline" size={30} color="#FFFFFF" />
                         }
                     </TouchableOpacity>
                 </View>
             </View>
         );
     };
+
+    const ListHeaderComponent = () => (
+        <>
+            <View style={styles.headerContainer}>
+                <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
+                    <MaterialCommunityIcons name="arrow-left" size={24} color="#FFFFFF" />
+                </TouchableOpacity>
+                <Text style={styles.title} numberOfLines={1}>Vendas de {nomeCliente}</Text>
+            </View>
+            <View style={styles.filtroContainer}>
+                <TouchableOpacity 
+                    style={[styles.filtroBotao, filtroAtivo === 'todas' && styles.filtroBotaoAtivo]}
+                    onPress={() => setFiltroAtivo('todas')}
+                ><Text style={styles.filtroTexto}>Todas</Text></TouchableOpacity>
+                <TouchableOpacity 
+                    style={[styles.filtroBotao, filtroAtivo === 'pendentes' && styles.filtroBotaoAtivo]}
+                    onPress={() => setFiltroAtivo('pendentes')}
+                ><Text style={styles.filtroTexto}>Pendentes</Text></TouchableOpacity>
+                <TouchableOpacity 
+                    style={[styles.filtroBotao, filtroAtivo === 'parciais' && styles.filtroBotaoAtivo]}
+                    onPress={() => setFiltroAtivo('parciais')}
+                ><Text style={styles.filtroTexto}>Parciais</Text></TouchableOpacity>
+                <TouchableOpacity 
+                    style={[styles.filtroBotao, filtroAtivo === 'quitadas' && styles.filtroBotaoAtivo]}
+                    onPress={() => setFiltroAtivo('quitadas')}
+                ><Text style={styles.filtroTexto}>Quitadas</Text></TouchableOpacity>
+            </View>
+        </>
+    );
 
     if (isLoading && !refreshing) {
         return (
@@ -235,21 +257,20 @@ export default function VendasClienteScreen() {
         <ImageBackground source={require("../assets/images/fundo.jpg")} style={styles.background} blurRadius={2}>
             <View style={styles.overlay} />
             <SafeAreaView style={styles.safeArea}>
-                <View style={styles.headerContainer}>
-                    <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-                        <MaterialCommunityIcons name="arrow-left" size={24} color="#FFFFFF" />
-                    </TouchableOpacity>
-                    <Text style={styles.title} numberOfLines={1}>Vendas de {nomeCliente}</Text>
-                </View>
-
                 <FlatList
-                    data={vendas}
+                    data={vendasFiltradas}
                     keyExtractor={(item) => item.id.toString()}
                     renderItem={renderItemVenda}
+                    ListHeaderComponent={ListHeaderComponent}
                     ListEmptyComponent={
                         <View style={styles.emptyListContainer}>
                             <MaterialCommunityIcons name="cart-off" size={60} color="rgba(255,255,255,0.3)" />
-                            <Text style={styles.listaVaziaTexto}>Nenhuma venda registrada para este cliente.</Text>
+                            <Text style={styles.listaVaziaTexto}>
+                                {vendas.length === 0 
+                                    ? "Nenhuma venda registrada para este cliente."
+                                    : "Nenhuma venda encontrada para este filtro."
+                                }
+                            </Text>
                         </View>
                     }
                     contentContainerStyle={styles.listContentContainer}
@@ -280,111 +301,61 @@ const styles = StyleSheet.create({
     backButton: { padding: 8, marginRight: 10 },
     title: { fontSize: 24, fontWeight: 'bold', color: '#FFFFFF', flex: 1 },
     listContentContainer: { paddingHorizontal: 16, paddingBottom: 100 },
-    cardVenda: {
+    filtroContainer: {
+        flexDirection: 'row',
+        justifyContent: 'space-around',
+        paddingHorizontal: 16,
+        paddingBottom: 20,
+        paddingTop: 5,
+    },
+    filtroBotao: {
+        paddingVertical: 8,
+        paddingHorizontal: 16,
+        borderRadius: 20,
         backgroundColor: 'rgba(255, 255, 255, 0.1)',
-        borderRadius: 12,
-        padding: 15,
-        marginBottom: 15,
         borderWidth: 1,
         borderColor: 'rgba(255, 255, 255, 0.2)',
     },
+    filtroBotaoAtivo: {
+        backgroundColor: '#81D4FA',
+        borderColor: '#81D4FA',
+    },
+    filtroTexto: {
+        color: '#FFFFFF',
+        fontWeight: 'bold',
+        fontSize: 13,
+    },
+    cardVenda: { backgroundColor: 'rgba(255, 255, 255, 0.1)', borderRadius: 12, padding: 15, marginBottom: 15, borderWidth: 1, borderColor: 'rgba(255, 255, 255, 0.2)', },
     cardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 },
     dataVenda: { fontSize: 14, color: '#E0E0FF', fontStyle: 'italic' },
     statusQuitada: { fontSize: 12, fontWeight: 'bold', color: '#A5D6A7', backgroundColor: 'rgba(76, 175, 80, 0.25)', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 10, overflow: 'hidden' },
     statusPendente: { fontSize: 12, fontWeight: 'bold', color: '#FFCC80', backgroundColor: 'rgba(255, 152, 0, 0.25)', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 10, overflow: 'hidden' },
-    itensContainer: {
-        marginBottom: 12,
-        paddingLeft: 4,
-        borderLeftWidth: 3,
-        borderLeftColor: 'rgba(255,255,255,0.15)',
-    },
-    itemLinha: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        marginBottom: 5,
-        paddingLeft: 10,
-    },
-    itemQuantidade: {
-        color: '#E0E0FF',
-        fontSize: 15,
-        fontWeight: 'bold',
-        marginRight: 8,
-        minWidth: 30,
-    },
-    itemDescricao: {
-        flex: 1,
-        color: '#E0E0E0',
-        fontSize: 15,
-    },
-    itemPreco: {
-        color: '#E0E0E0',
-        fontSize: 15,
-        fontWeight: '500',
-        marginLeft: 8,
-    },
-    detalhesFinanceiros: {
-        borderTopWidth: 1,
-        borderBottomWidth: 1,
-        borderColor: 'rgba(255,255,255,0.15)',
-        paddingVertical: 10,
-        marginVertical: 10,
-        flexDirection: 'row',
-        flexWrap: 'wrap',
-        justifyContent: 'space-between',
-    },
+    itensContainer: { marginBottom: 12, paddingLeft: 4, borderLeftWidth: 3, borderLeftColor: 'rgba(255,255,255,0.15)', },
+    itemLinha: { flexDirection: 'row', alignItems: 'center', marginBottom: 5, paddingLeft: 10, },
+    itemQuantidade: { color: '#E0E0FF', fontSize: 15, fontWeight: 'bold', marginRight: 8, minWidth: 30, },
+    itemDescricao: { flex: 1, color: '#E0E0E0', fontSize: 15, },
+    itemPreco: { color: '#E0E0E0', fontSize: 15, fontWeight: '500', marginLeft: 8, },
+    detalhesFinanceiros: { borderTopWidth: 1, borderBottomWidth: 1, borderColor: 'rgba(255,255,255,0.15)', paddingVertical: 10, marginVertical: 10, flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', },
     valorLabel: { fontSize: 14, color: '#E0E0FF', width: '40%', lineHeight: 22 },
     valorMontante: { fontSize: 15, color: '#FFFFFF', fontWeight: '500', width: '60%', textAlign: 'right', lineHeight: 22 },
     textoPendente: { color: '#FFAB91', fontWeight: 'bold' },
     textoDesconto: { color: '#FFCC80' },
     textoQuitado: { color: '#A5D6A7' },
-    labelTotalFinal: {
-        fontWeight: 'bold',
-    },
-    textoTotalFinal: {
-        fontWeight: 'bold',
-        fontSize: 16,
-    },
-    divisorFinanceiro: {
-        height: 1,
-        backgroundColor: 'rgba(255, 255, 255, 0.15)',
-        width: '100%',
-        marginVertical: 8,
-    },
+    labelTotalFinal: { fontWeight: 'bold', },
+    textoTotalFinal: { fontWeight: 'bold', fontSize: 16, },
+    divisorFinanceiro: { height: 1, backgroundColor: 'rgba(255, 255, 255, 0.15)', width: '100%', marginVertical: 8, },
     barraProgressoContainer: { height: 8, backgroundColor: 'rgba(0,0,0,0.3)', borderRadius: 4, overflow: 'hidden', marginTop: 10 },
     barraProgresso: { height: '100%', backgroundColor: '#66BB6A', borderRadius: 4 },
     botoesAcaoCard: { flexDirection: 'row', justifyContent: 'flex-end', alignItems: 'center', marginTop: 15, paddingTop: 10, borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,0.1)'},
-    botaoCard: { flexDirection: 'row', alignItems: 'center', paddingVertical: 8, paddingHorizontal: 10, borderRadius: 20, marginLeft: 10 },
+    botaoCard: { justifyContent: 'center', alignItems: 'center', padding: 10, borderRadius: 25, marginLeft: 10 },
     textoBotaoCard: { color: 'white', fontSize: 13, fontWeight: '600', marginLeft: 6 },
-    
     botaoEditar: { backgroundColor: 'rgba(103, 58, 183, 0.7)' },
     botaoDetalhes: { backgroundColor: 'rgba(33, 150, 243, 0.7)' },
     botaoExcluir: { backgroundColor: 'rgba(211, 47, 47, 0.7)' },
-    emptyListContainer: { justifyContent: 'center', alignItems: 'center', paddingTop: '30%' },
+    emptyListContainer: { justifyContent: 'center', alignItems: 'center', paddingTop: '20%' },
     listaVaziaTexto: { textAlign: 'center', fontSize: 18, fontWeight: 'bold', color: 'rgba(255,255,255,0.7)', marginTop: 15 },
-    footerAcoes: {
-        position: 'absolute',
-        bottom: 0,
-        left: 0,
-        right: 0,
-        paddingHorizontal: 20,
-        paddingTop: 20,
-        backgroundColor: 'rgba(25, 10, 50, 0.9)',
-        borderTopWidth: 1,
-        borderTopColor: 'rgba(255, 255, 255, 0.1)',
-    },
-    botaoPrincipal: {
-        backgroundColor: '#4CAF50',
-        flexDirection: 'row',
-        paddingVertical: 15,
-        borderRadius: 25,
-        alignItems: 'center',
-        justifyContent: 'center',
-    },
-    textoBotaoPrincipal: {
-        color: 'white',
-        fontSize: 17,
-        fontWeight: 'bold',
-        marginLeft: 10,
-    },
+    footerAcoes: { position: 'absolute', bottom: 0, left: 0, right: 0, paddingHorizontal: 20, paddingTop: 20, backgroundColor: 'rgba(25, 10, 50, 0.9)', borderTopWidth: 1, borderTopColor: 'rgba(255, 255, 255, 0.1)', },
+    botaoPrincipal: { backgroundColor: '#4CAF50', flexDirection: 'row', paddingVertical: 15, borderRadius: 25, alignItems: 'center', justifyContent: 'center', },
+    textoBotaoPrincipal: { color: 'white', fontSize: 17, fontWeight: 'bold', marginLeft: 10, },
     disabledButton: { opacity: 0.5 },
 });

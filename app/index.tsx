@@ -1,31 +1,17 @@
-// app/index.tsx
-import {
-    View,
-    Text,
-    TextInput,
-    Alert,
-    StyleSheet,
-    ImageBackground,
-    TouchableOpacity,
-    ActivityIndicator,
-    Platform,
-    KeyboardAvoidingView,
-    ScrollView,
-    SafeAreaView,
-    StatusBar,
-} from "react-native";
+//index.tsx(Tela de Login)
+import { View, Text, TextInput, Alert, StyleSheet, ImageBackground, TouchableOpacity, ActivityIndicator, Platform, KeyboardAvoidingView, ScrollView, SafeAreaView, StatusBar, } from "react-native";
 import React, { useState, useEffect, useRef } from "react";
 import { useRouter } from "expo-router";
 import CryptoJS from "crypto-js";
 import { Usuario } from "../src/types";
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-
-// ✨ 1. Funções de storage agora são importadas do arquivo central
-import { obterTodosUsuarios } from "../src/storage/usuarioStorage";
-
-// ✨ 2. As funções locais que estavam aqui foram REMOVIDAS.
+import Constants from 'expo-constants';
+import { obterTodosUsuariosSQLite as obterTodosUsuarios } from "../src/database/sqlite";
 
 export default function TelaLoginScreen() {
+    // Variável para guardar a versão do app
+    const appVersion = Constants.expoConfig?.version;
+
     const [username, setUsername] = useState("");
     const [password, setPassword] = useState("");
     const [isLoading, setIsLoading] = useState(false);
@@ -33,25 +19,22 @@ export default function TelaLoginScreen() {
     const router = useRouter();
     const passwordInputRef = useRef<TextInput>(null);
 
-    // ✨ 3. Lógica de inicialização ATUALIZADA
     useEffect(() => {
         const initializeApp = async () => {
             try {
                 const usuariosExistentes = await obterTodosUsuarios();
                 
                 if (usuariosExistentes.length === 0) {
-                    // Se não há usuários, redireciona para a tela de cadastro inicial.
                     console.log("Nenhum usuário encontrado, redirecionando para o cadastro inicial...");
-                    router.replace('/CadastroInicial'); // Usa 'replace' para não deixar o usuário voltar
+                    router.replace('/CadastroInicial');
                 } else {
-                    // Se já existem usuários, termina a inicialização e mostra a tela de login.
                     console.log("Usuários existentes encontrados. Carregando tela de login.");
                     setIsInitializing(false);
                 }
             } catch (e) {
                 console.error("Erro ao inicializar dados do aplicativo:", e);
                 Alert.alert("Erro de Inicialização", "Falha ao verificar os dados iniciais do usuário.");
-                setIsInitializing(false); // Garante que a tela não fique em loading infinito em caso de erro
+                setIsInitializing(false);
             }
         };
         initializeApp();
@@ -66,7 +49,6 @@ export default function TelaLoginScreen() {
         setIsLoading(true);
         try {
             const usuarios = await obterTodosUsuarios();
-
             if (usuarios.length === 0 && !isInitializing) {
                 Alert.alert("Erro", "Nenhum usuário cadastrado. Por favor, reinicie o aplicativo para criar uma conta.");
                 setIsLoading(false);
@@ -124,7 +106,7 @@ export default function TelaLoginScreen() {
                 >
                     <ScrollView contentContainerStyle={styles.scrollContainer}>
                         <View style={styles.logoContainer}>
-                            <MaterialCommunityIcons name="shield-check-outline" size={80} color="#FFFFFF" />
+                            <MaterialCommunityIcons name="shield-check-outline" size={80} color="#71d44aff" />
                             <Text style={styles.appName}>CVSApp</Text>
                             <Text style={styles.screenTitle}>Acesso da Consultora</Text>
                         </View>
@@ -134,7 +116,7 @@ export default function TelaLoginScreen() {
                                 <MaterialCommunityIcons name="account-outline" size={22} color="#A9A9A9" style={styles.inputIcon} />
                                 <TextInput
                                     style={styles.input}
-                                    placeholder="Nome de Usuário"
+                                    placeholder="Usuário"
                                     onChangeText={setUsername}
                                     value={username}
                                     placeholderTextColor="#A9A9A9"
@@ -171,6 +153,13 @@ export default function TelaLoginScreen() {
                                 </TouchableOpacity>
                             )}
                         </View>
+                        
+                        {/* TEXTO DA VERSÃO */}
+                        {appVersion && (
+                            <Text style={styles.versionText}>
+                                Versão {appVersion}
+                            </Text>
+                        )}
                     </ScrollView>
                 </KeyboardAvoidingView>
             </SafeAreaView>
@@ -178,7 +167,7 @@ export default function TelaLoginScreen() {
     );
 }
 
-// ... (os estilos permanecem os mesmos)
+
 const styles = StyleSheet.create({
     background: { flex: 1, },
     overlay: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(25, 10, 50, 0.65)', },
@@ -197,4 +186,12 @@ const styles = StyleSheet.create({
     loginButton: { backgroundColor: 'rgba(76, 175, 80, 0.8)', flexDirection: 'row', paddingVertical: 15, borderRadius: 25, marginTop: 20, alignItems: 'center', justifyContent: 'center', elevation: 3, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.3, shadowRadius: 3, },
     loginButtonText: { color: "white", fontSize: 17, fontWeight: "bold", marginLeft: 10, },
     loader: { marginTop: 20, paddingVertical: 15, },
+    
+    versionText: {
+        textAlign: 'center',
+        color: 'rgba(255, 255, 255, 0.4)',
+        fontSize: 12,
+        marginTop: 30,
+        paddingBottom: 10,
+    },
 });

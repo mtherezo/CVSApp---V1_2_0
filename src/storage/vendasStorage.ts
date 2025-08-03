@@ -2,7 +2,7 @@
 import { Alert } from 'react-native';
 import {
     cadastrarVendaSQLite,
-    editarVendaSQLite, // ✨ 1. Importa a nova função de edição da base de dados
+    editarVendaSQLite,
     listarTodasVendasSQLite,
     listarVendasPorClienteSQLite,
     listarVendaPorIdSQLite,
@@ -24,7 +24,7 @@ export const cadastrarVenda = async (venda: Omit<Venda, 'id'>): Promise<Venda | 
     }
 };
 
-// ✨ 2. NOVA FUNÇÃO ADICIONADA E EXPORTADA
+
 /**
  * Edita uma venda existente na base de dados.
  */

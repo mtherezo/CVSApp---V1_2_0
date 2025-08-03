@@ -12,7 +12,7 @@ interface LembreteWhatsAppProps {
   numeroParcela?: number;
   totalParcelas?: number;
   subtotal: number;
-  desconto?: number; // ✨ 1. Adicionada a nova propriedade para o desconto
+  desconto?: number;
   style?: StyleProp<ViewStyle>;
 }
 
@@ -26,7 +26,7 @@ const EnviarLembreteWhatsAppButton: React.FC<LembreteWhatsAppProps> = ({
   numeroParcela,
   totalParcelas,
   subtotal,
-  desconto, // ✨ 2. Recebendo a nova propriedade
+  desconto,
   style,
 }) => {
   const formatarTelefone = (telefoneInput: string): string => {
@@ -70,7 +70,7 @@ const EnviarLembreteWhatsAppButton: React.FC<LembreteWhatsAppProps> = ({
         }
     }
 
-    // ✨ 3. Lógica para montar a mensagem, agora incluindo o desconto
+    // Lógica para montar a mensagem, agora incluindo o desconto
     let mensagem = `Olá ${nomeCliente},\n\n`;
     mensagem += `Estou passando só pra lembrar ${tipoLembrete}, da compra realizada em ${dataCompraFormatada}. `;
     mensagem += `O valor de R$ ${valorLembrete.toFixed(2)} vence em ${dataVencimentoFormatada}.\n`;
@@ -100,7 +100,7 @@ const EnviarLembreteWhatsAppButton: React.FC<LembreteWhatsAppProps> = ({
 
   return (
     <TouchableOpacity style={[styles.botaoLembrete, style]} onPress={handleEnviarLembrete}>
-      <MaterialCommunityIcons name="whatsapp" size={20} color="#FFFFFF" />
+      <MaterialCommunityIcons name="whatsapp" size={24} color="#FFFFFF" />
       <Text style={styles.textoBotaoLembrete}>Lembrete</Text>
    </TouchableOpacity>
   );

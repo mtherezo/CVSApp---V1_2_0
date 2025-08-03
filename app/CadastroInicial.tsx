@@ -1,13 +1,10 @@
 // app/CadastroInicial.tsx
 import React, { useState } from 'react';
-import {
-    View, Text, TextInput, Alert, StyleSheet, ImageBackground, TouchableOpacity,
-    ActivityIndicator, Platform, KeyboardAvoidingView, ScrollView, SafeAreaView, StatusBar
-} from "react-native";
+import { View, Text, TextInput, Alert, StyleSheet, ImageBackground, TouchableOpacity, ActivityIndicator, Platform, KeyboardAvoidingView, ScrollView, SafeAreaView, StatusBar} from "react-native";
 import { useRouter } from "expo-router";
 import CryptoJS from "crypto-js";
 import { Usuario } from "../src/types";
-import { salvarTodosUsuarios } from '../src/storage/usuarioStorage'; // Importa a função do arquivo compartilhado
+import { adicionarOuAtualizarUsuarioSQLite } from '../src/database/sqlite';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 
 export default function CadastroInicialScreen() {
@@ -39,7 +36,8 @@ export default function CadastroInicialScreen() {
                 passwordHash,
             };
             
-            await salvarTodosUsuarios([novoUsuario]);
+            // CHAMADA DA FUNÇÃO
+            await adicionarOuAtualizarUsuarioSQLite(novoUsuario);
 
             Alert.alert(
                 "Conta Criada com Sucesso!",
@@ -129,7 +127,6 @@ export default function CadastroInicialScreen() {
     );
 }
 
-// Estilos (muitos são reutilizados da tela de login para manter a consistência)
 const styles = StyleSheet.create({
     background: { flex: 1, },
     overlay: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(25, 10, 50, 0.65)', },

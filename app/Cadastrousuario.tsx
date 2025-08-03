@@ -1,4 +1,3 @@
-// app/Cadastrousuario.tsx
 import React, { useState, useCallback } from 'react';
 import {
     View, Text, FlatList, StyleSheet, TouchableOpacity, Alert, ImageBackground,
@@ -6,10 +5,17 @@ import {
     TextInput, ScrollView
 } from 'react-native';
 import { Usuario } from '../src/types';
-import { useRouter, useFocusEffect } from 'expo-router';
-import { obterTodosUsuarios, adicionarOuAtualizarUsuario, excluirUsuario } from '../src/storage/usuarioStorage';
+import { useRouter, useFocusEffect, useLocalSearchParams } from 'expo-router';
+import { 
+    obterTodosUsuariosSQLite as obterTodosUsuarios,
+    adicionarOuAtualizarUsuarioSQLite as adicionarOuAtualizarUsuario,
+    excluirUsuarioSQLite as excluirUsuario,
+    buscarUsuarioPorUsernameSQLite
+} from '../src/database/sqlite';
+//import { obterTodosUsuarios, adicionarOuAtualizarUsuario, excluirUsuario, buscarUsuarioPorUsernameSQLite } from '../src/storage/usuarioStorage';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import CryptoJS from "crypto-js";
+import PasswordPromptModal from '../src/components/PasswordPromptModal';
 
 // Componente para o Formulário de Usuário
 const FormularioUsuario = ({ usuarioEditando, onSave, onCancel, isSaving }) => {
@@ -90,7 +96,13 @@ export default function GerenciarUsuariosScreen() {
     const [usuarioEditando, setUsuarioEditando] = useState<Usuario | null>(null);
     const [isSaving, setIsSaving] = useState(false);
 
+    // Estados para controlar o modal de confirmação de senha
+    const [isPromptVisible, setIsPromptVisible] = useState(false);
+    const [isVerifyingPassword, setIsVerifyingPassword] = useState(false);
+    const [usuarioParaExcluir, setUsuarioParaExcluir] = useState<Usuario | null>(null);
+
     const router = useRouter();
+    const { username: loggedInUsername } = useLocalSearchParams<{ username?: string }>();
 
     const carregarUsuarios = async (showLoader = true) => {
         if (showLoader) setIsLoading(true);
@@ -115,8 +127,7 @@ export default function GerenciarUsuariosScreen() {
     const handleSalvarUsuario = async ({ username, password }) => {
         setIsSaving(true);
         try {
-            let passwordHash = usuarioEditando?.passwordHash; // Mantém o hash antigo por padrão
-            // Se uma nova senha foi digitada, gera um novo hash
+            let passwordHash = usuarioEditando?.passwordHash;
             if (password) {
                 passwordHash = CryptoJS.SHA256(password).toString();
             }
@@ -126,7 +137,6 @@ export default function GerenciarUsuariosScreen() {
                 passwordHash: passwordHash!,
             };
 
-            // ✨ USA A FUNÇÃO CORRETA para adicionar ou atualizar, sem apagar os outros
             await adicionarOuAtualizarUsuario(usuarioParaSalvar);
             
             await carregarUsuarios(false);
@@ -138,26 +148,61 @@ export default function GerenciarUsuariosScreen() {
         }
     };
 
+    // Função de exclusão agora abre o modal de senha
     const handleConfirmarExclusao = (usuario: Usuario) => {
         if (usuarios.length <= 1) {
             Alert.alert("Ação não permitida", "Não é possível excluir o único usuário do sistema.");
             return;
         }
-        Alert.alert(
-            'Confirmar Exclusão',
-            `Tem certeza que deseja excluir o usuário "${usuario.username}"?`,
-            [
-                { text: 'Cancelar', style: 'cancel' },
-                {
-                    text: 'Excluir',
-                    style: 'destructive',
-                    onPress: async () => {
-                        await excluirUsuario(usuario.username);
-                        await carregarUsuarios(false);
-                    }
-                }
-            ]
-        );
+        if (usuario.username.toLowerCase() === loggedInUsername?.toLowerCase()) {
+            Alert.alert("Ação não permitida", "Você não pode excluir seu próprio usuário.");
+            return;
+        }
+        setUsuarioParaExcluir(usuario);
+        setIsPromptVisible(true);
+    };
+
+    // Nova função para verificar a senha e prosseguir com a exclusão
+    const handlePasswordSubmit = async (password: string) => {
+        if (!password || !loggedInUsername || !usuarioParaExcluir) {
+            setIsPromptVisible(false);
+            return;
+        }
+
+        setIsVerifyingPassword(true);
+        try {
+            const adminUser = await buscarUsuarioPorUsernameSQLite(loggedInUsername);
+            if (!adminUser) throw new Error("Usuário admin não encontrado.");
+
+            const passwordHashDigitado = CryptoJS.SHA256(password).toString();
+
+            if (passwordHashDigitado === adminUser.passwordHash) {
+                setIsPromptVisible(false);
+                Alert.alert(
+                    'Confirmar Exclusão Final',
+                    `Senha confirmada. Deseja realmente excluir o usuário "${usuarioParaExcluir.username}"?`,
+                    [
+                        { text: 'Cancelar', style: 'cancel', onPress: () => setUsuarioParaExcluir(null) },
+                        {
+                            text: 'Excluir', style: 'destructive',
+                            onPress: async () => {
+                                await excluirUsuario(usuarioParaExcluir.username);
+                                await carregarUsuarios(false);
+                                setUsuarioParaExcluir(null);
+                            }
+                        }
+                    ]
+                );
+            } else {
+                Alert.alert("Senha Incorreta", "A senha digitada não confere. A exclusão foi cancelada.");
+                setIsPromptVisible(false);
+            }
+        } catch (error) {
+            Alert.alert("Erro de Verificação", "Ocorreu um erro ao verificar a senha.");
+            setIsPromptVisible(false);
+        } finally {
+            setIsVerifyingPassword(false);
+        }
     };
 
     const usuariosFiltrados = usuarios.filter(u => 
@@ -222,7 +267,7 @@ export default function GerenciarUsuariosScreen() {
                             keyExtractor={(item) => item.username}
                             renderItem={renderItemUsuario}
                             ListEmptyComponent={<View style={styles.emptyContainer}><Text style={styles.emptyText}>Nenhum usuário encontrado.</Text></View>}
-                            contentContainerStyle={{ paddingHorizontal: 16 }}
+                            contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 100 }}
                             refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#FFFFFF" />}
                         />
                         <View style={styles.footer}>
@@ -233,6 +278,15 @@ export default function GerenciarUsuariosScreen() {
                         </View>
                     </>
                 )}
+
+                <PasswordPromptModal
+                    visible={isPromptVisible}
+                    onClose={() => setIsPromptVisible(false)}
+                    onSubmit={handlePasswordSubmit}
+                    title="Confirmar Ação"
+                    message={`Para excluir o usuário "${usuarioParaExcluir?.username}", digite sua senha de administrador.`}
+                    isSubmitting={isVerifyingPassword}
+                />
             </SafeAreaView>
         </ImageBackground>
     );

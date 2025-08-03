@@ -1,11 +1,10 @@
+// app/_layout.tsx
 import { Stack, SplashScreen } from "expo-router";
 import React, { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, StatusBar, Platform } from 'react-native';
-
-// ✨ Passo 1 da Inicialização: Prepara a ESTRUTURA do banco de dados (tabelas, colunas, etc.)
 import { setupDatabase } from '../src/database/sqlite'; 
-// ✨ Passo 2 da Inicialização: Migra os DADOS do AsyncStorage para o SQLite (só roda uma vez)
 import { executarMigracaoDeDados } from '../src/database/migration';
+import { useFonts } from 'expo-font';
 
 // Mantém a tela de splash nativa visível enquanto preparamos o app.
 SplashScreen.preventAutoHideAsync();
@@ -14,30 +13,54 @@ export default function RootLayout() {
   const [appPronto, setAppPronto] = useState(false);
   const [erroSetup, setErroSetup] = useState<string | null>(null);
 
+  // Carrega as fontes customizadas
+  const [fontsLoaded, fontError] = useFonts({
+    // os nomes aqui são os que você usará no seu StyleSheet
+    'NotoSansJP': require('../assets/fonts/NotoSansJP-VariableFont_wght.ttf'),
+    'Playwrite': require('../assets/fonts/PlaywriteAUQLD-VariableFont_wght.ttf'),
+    'Playwrite-Regular': require('../assets/fonts/PlaywriteAUQLD-Regular.ttf'),
+    'Playwrite-Thin': require('../assets/fonts/PlaywriteAUQLD-Thin.ttf'),
+    // Adicionar outras variações que desejar (ex: Italic, SemiBold, etc.)
+  });
+
   useEffect(() => {
     const prepararApp = async () => {
       try {
-        // 1. Configura ou migra o SCHEMA do banco de dados para a última versão.
-        console.log("INICIALIZAÇÃO: Preparando estrutura do banco de dados...");
-        await setupDatabase();
+        // ✨ 3. Agora esperamos por duas coisas: o DB e as fontes.
+        // O Promise.all executa as tarefas em paralelo para mais eficiência.
+        await Promise.all([
+          setupDatabase(),
+          executarMigracaoDeDados(),
+        ]);
         
-        // 2. Executa a migração de DADOS do AsyncStorage (só roda uma vez).
-        console.log("INICIALIZAÇÃO: Verificando migração de dados antigos...");
-        await executarMigracaoDeDados();
-
-        console.log("INICIALIZAÇÃO: Aplicativo pronto para iniciar.");
-        setAppPronto(true);
+        console.log("INICIALIZAÇÃO: Banco de dados e migração prontos.");
+        
+        // A verificação das fontes acontece separadamente com o hook useFonts
       } catch (error: any) {
         console.error("Falha crítica ao preparar a aplicação:", error);
         setErroSetup(error.message || "Ocorreu um erro desconhecido ao configurar o app.");
-      } finally {
-        // Esconde a tela de splash, seja em caso de sucesso ou erro.
-        SplashScreen.hideAsync();
       }
     };
     
     prepararApp();
   }, []); // O array vazio [] garante que este efeito rode apenas uma vez.
+
+  // Novo useEffect para reagir ao carregamento das fontes
+  useEffect(() => {
+    // Se as fontes carregaram ou se deu erro nelas, consideramos essa parte pronta
+    if (fontsLoaded || fontError) {
+      if (fontError) {
+        console.error("Erro ao carregar fontes:", fontError);
+        // Decide se quer mostrar um erro crítico ou usar as fontes padrão
+        setErroSetup("Não foi possível carregar as fontes customizadas.");
+      }
+      
+      // Marca o app como pronto e esconde a splash screen
+      setAppPronto(true);
+      SplashScreen.hideAsync();
+      console.log("INICIALIZAÇÃO: Fontes carregadas. Aplicativo pronto para iniciar.");
+    }
+  }, [fontsLoaded, fontError]); // Roda sempre que o estado das fontes mudar
 
   if (erroSetup) {
     return (
@@ -50,8 +73,8 @@ export default function RootLayout() {
     );
   }
 
+  // Se o app (DB + fontes) ainda não está pronto, a splash screen continua visível
   if (!appPronto) {
-    // Retorna nulo enquanto o app não está pronto, pois a tela de splash está visível.
     return null;
   }
 
@@ -69,8 +92,10 @@ export default function RootLayout() {
       <Stack.Screen name="Pesquisarvendascliente" />
       <Stack.Screen name="Todasvendas" />
       <Stack.Screen name="Vendascliente" /> 
-      <Stack.Screen name="Vendasporclientes" />
       <Stack.Screen name="Produtos" />
+      <Stack.Screen name="Configuracoes" />
+      <Stack.Screen name="Sobre" />
+      <Stack.Screen name="Backup" />
     </Stack>
   );
 }

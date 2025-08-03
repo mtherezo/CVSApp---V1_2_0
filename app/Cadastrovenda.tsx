@@ -452,7 +452,7 @@ const styles = StyleSheet.create({
         fontWeight: 'bold',
         fontSize: 16
     },
-    // ✨ NOVO: Estilos para o campo de busca no catálogo
+    // Estilos para o campo de busca no catálogo
     buscaContainer: {
         flexDirection: 'row',
         alignItems: 'center',

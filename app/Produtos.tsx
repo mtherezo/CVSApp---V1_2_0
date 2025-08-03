@@ -81,6 +81,7 @@ const FormularioProduto = ({ produtoEditando, onSave, onCancel, isSaving }) => {
                     value={descricao}
                     onChangeText={setDescricao}
                     placeholderTextColor="#A9A9A9"
+                    
                 />
                 <TextInput
                     style={styles.input}
@@ -161,6 +162,8 @@ export default function ProdutosScreen() {
             const produtoParaSalvar: Produto = {
                 id: produtoEditando?.id || Crypto.randomUUID(),
                 descricao: descricao.trim(),
+                marca: '',
+                quantidadeEstoque: 0,
                 valor: valorNum,
             };
             await cadastrarProduto(produtoParaSalvar);

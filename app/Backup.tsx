@@ -10,7 +10,7 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { db } from '../src/database/sqlite';
 import * as MediaLibrary from 'expo-media-library'; // Importa a biblioteca de permissões
 
-// ✨ IMPORTANTE: Lembre-se de colocar o nome real do seu arquivo de banco de dados aqui
+
 const DATABASE_NAME = "cvsapp.db"; 
 
 export default function BackupScreen() {
@@ -244,4 +244,5 @@ const styles = StyleSheet.create({
         fontWeight: '600',
         color: '#FFFFFF'
     }
+    
 });

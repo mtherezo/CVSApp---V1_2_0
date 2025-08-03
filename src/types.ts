@@ -18,27 +18,27 @@ export interface Cliente {
 export interface Pagamento {
   id: string;
   idVenda: string; 
-  dataPagamento: string; // ISO string
+  dataPagamento: string;
   valorPago: number;
+  
 }
 
 export interface Venda {
   id: string;
   idCliente: string;
   clienteNome: string;
-  clienteTelefone?: string | null; // ✨ CORREÇÃO: Permite que seja nulo, como no banco.
+  clienteTelefone?: string | null; //  Permite que seja nulo, como no banco.
   itens: ItemVenda[];
   dataVenda: string; 
   subtotal: number;
   valorTotal: number;
-  // ✨ CORREÇÃO: Removido 'totalFinal' por ser um duplicado de 'valorTotal'.
   tipoPagamento: 'À Vista' | 'Parcelado';
   parcelasTotais?: number;
   parcelasPagas?: number;   
   pagamentos?: Pagamento[]; 
   desconto?: number;
   dataPrimeiraParcela?: string; 
-  // ✨ CORREÇÃO: Removido 'dataDemaisParcelas' que não existe na tabela do banco.
+ 
 }
 
 
@@ -50,5 +50,7 @@ export interface Usuario {
 export interface Produto {
   id: string;
   descricao: string;
+  marca: string;
+  quantidadeEstoque: number;
   valor: number;
 }

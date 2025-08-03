@@ -2,8 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, ImageBackground, Alert, ActivityIndicator, ScrollView, KeyboardAvoidingView, Platform, StatusBar, SafeAreaView} from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { Cliente } from '../src/types';
-import * as Crypto from 'expo-crypto'; // ✨ SUBSTITUÍDO: uuid por expo-crypto para gerar IDs
-// ✨ SUBSTITUÍDO: Importações do storage antigo pelas novas do SQLite
+import * as Crypto from 'expo-crypto'; //expo-crypto para gerar IDs
+// Importações do storage antigo pelas novas do SQLite
 import { cadastrarClienteSQLite, buscarClientePorIdSQLite } from '../src/database/sqlite';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 
@@ -27,13 +27,13 @@ export default function CadastroClienteScreen() {
       setIsLoadingData(true);
       const carregarDadosDoCliente = async () => {
         try {
-          // ✨ MUDANÇA: Chama a função do SQLite para buscar o cliente
+          // Chama a função do SQLite para buscar o cliente
           const clienteExistente = await buscarClientePorIdSQLite(clienteIdParaEditar);
           if (clienteExistente) {
             setNome(clienteExistente.nome);
             setTelefone(clienteExistente.telefone || '');
             setEmail(clienteExistente.email || '');
-            setEndereco(clienteExistente.endereco || ''); // ✨ Adicionado para carregar o endereço
+            setEndereco(clienteExistente.endereco || ''); //Adicionado para carregar o endereço
           } else {
             Alert.alert('Erro', 'Cliente não encontrado para edição.');
             router.back();
@@ -63,7 +63,7 @@ export default function CadastroClienteScreen() {
     setIsSaving(true);
 
     const dadosCliente: Cliente = {
-      // ✨ MUDANÇA: Se estiver editando, usa o ID existente. Se for novo, gera um UUID seguro.
+      // Se estiver editando, usa o ID existente. Se for novo, gera um UUID seguro.
       id: isEditing && clienteIdParaEditar ? clienteIdParaEditar : Crypto.randomUUID(),
       nome: nome.trim(),
       telefone: telefone.trim(),
@@ -72,7 +72,7 @@ export default function CadastroClienteScreen() {
     };
 
     try {
-      // ✨ SIMPLIFICAÇÃO: A mesma função agora serve para cadastrar e editar!
+      // SIMPLIFICAÇÃO: A mesma função agora serve para cadastrar e editar!
       await cadastrarClienteSQLite(dadosCliente);
       
       Alert.alert('Sucesso', `Cliente ${isEditing ? 'atualizado' : 'cadastrado'} com sucesso!`);
@@ -86,8 +86,7 @@ export default function CadastroClienteScreen() {
     }
   };
 
-  // O resto do seu componente (JSX e estilos) está perfeito e não precisa de alterações.
-  // ... (todo o seu JSX e estilos permanecem aqui)
+  
   if (isLoadingData) {
     return (
       <ImageBackground source={require("../assets/images/fundo.jpg")} style={styles.background} blurRadius={2}>

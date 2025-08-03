@@ -1,21 +1,8 @@
-import React, { useState } from 'react';
-import {
-  View,
-  Text,
-  TextInput,
-  FlatList,
-  TouchableOpacity,
-  StyleSheet,
-  ImageBackground,
-  ActivityIndicator,
-  Platform,
-  SafeAreaView,
-  Alert,
-  StatusBar,
-} from 'react-native';
+//Pesquisarvendascliente.tsx
+import React, { useState, useEffect } from 'react';
+import { View, Text, TextInput, FlatList, TouchableOpacity, StyleSheet, ImageBackground, ActivityIndicator, Platform, SafeAreaView, Alert, StatusBar,} from 'react-native';
 import { useRouter } from 'expo-router';
 import { Cliente } from '../src/types';
-// ✨ SUBSTITUÍDO: Importa a nova função de pesquisa do SQLite
 import { pesquisarClientesPorNomeSQLite } from '../src/database/sqlite';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 
@@ -26,12 +13,21 @@ export default function PesquisarVendasClienteScreen() {
   const [pesquisaRealizada, setPesquisaRealizada] = useState(false);
   const router = useRouter();
 
+  
+  useEffect(() => {
+    // Se o campo de busca for limpo pelo usuário, reseta a tela para o estado inicial
+    if (termoPesquisa.trim() === '') {
+        setClientesEncontrados([]);
+        setPesquisaRealizada(false);
+    }
+  }, [termoPesquisa]); // Este efeito roda sempre que o 'termoPesquisa' mudar
+
   const handlePesquisarClientes = async () => {
     const termo = termoPesquisa.trim();
     if (!termo) {
       Alert.alert("Atenção", "Por favor, digite um nome para pesquisar.");
       setClientesEncontrados([]);
-      setPesquisaRealizada(false); // Volta ao estado inicial se a busca for vazia
+      setPesquisaRealizada(false);
       return;
     }
     
@@ -39,8 +35,6 @@ export default function PesquisarVendasClienteScreen() {
     setPesquisaRealizada(true);
 
     try {
-      // ✨ SIMPLIFICADO: A pesquisa agora é feita diretamente no banco de dados.
-      // É muito mais rápido e eficiente do que carregar todos os clientes para a memória.
       const filtrados = await pesquisarClientesPorNomeSQLite(termo);
       setClientesEncontrados(filtrados);
     } catch (error) {
@@ -143,6 +137,7 @@ export default function PesquisarVendasClienteScreen() {
               renderItem={renderItemCliente}
               ListEmptyComponent={renderEmptyOrInitialState}
               contentContainerStyle={{paddingTop: 10}}
+              keyboardShouldPersistTaps="handled"
             />
         </View>
       </SafeAreaView>
@@ -194,7 +189,7 @@ const styles = StyleSheet.create({
     marginLeft: 10,
     justifyContent: 'center',
     alignItems: 'center',
-    minHeight: 52, // Para alinhar com altura do input
+    minHeight: 52,
   },
   searchButtonText: {
     color: '#FFFFFF',

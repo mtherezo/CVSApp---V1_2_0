@@ -179,7 +179,7 @@ export default function ClientesScreen() {
                 disabled={!clienteSelecionado || isDeleting}
             >
                 <MaterialCommunityIcons name="cash-multiple" size={22} color="#FFFFFF" />
-                <Text style={styles.textoBotaoAcao}>Ver Vendas</Text>
+                <Text style={styles.textoBotaoAcao}>Vendas</Text>
             </TouchableOpacity>
 
             <TouchableOpacity
