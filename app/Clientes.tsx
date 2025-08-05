@@ -1,18 +1,6 @@
+//Clientes.tsx
 import React, { useState, useCallback } from 'react';
-import {
-  View,
-  Text,
-  FlatList,
-  StyleSheet,
-  TouchableOpacity,
-  Alert,
-  ImageBackground,
-  ActivityIndicator,
-  RefreshControl,
-  Platform,
-  SafeAreaView,
-  StatusBar,
-} from 'react-native';
+import { View, Text, FlatList, StyleSheet, TouchableOpacity, Alert, ImageBackground, ActivityIndicator, RefreshControl, Platform, SafeAreaView, StatusBar,} from 'react-native';
 import { Cliente } from '../src/types';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { listarClientesSQLite, excluirClienteSQLite } from '../src/database/sqlite';

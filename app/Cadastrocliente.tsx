@@ -1,3 +1,4 @@
+//Cadastrocliente.tsx
 import React, { useState, useEffect } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, ImageBackground, Alert, ActivityIndicator, ScrollView, KeyboardAvoidingView, Platform, StatusBar, SafeAreaView} from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';

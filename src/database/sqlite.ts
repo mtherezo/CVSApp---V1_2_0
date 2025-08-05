@@ -1,3 +1,4 @@
+// src/database/sqlite.ts
 import * as SQLite from 'expo-sqlite';
 import * as Crypto from 'expo-crypto';
 import { Cliente, Venda, Pagamento, ItemVenda, Usuario, Produto } from '../types';
@@ -6,10 +7,13 @@ export const db = SQLite.openDatabaseSync('cvsapp.db');
 
 export const setupDatabase = async () => {
     try {
+        //  LOG ADICIONADO
+        console.log("LOG: Iniciando setupDatabase...");
         await db.execAsync('PRAGMA foreign_keys = ON;');
         
         let currentDbVersion = (await db.getFirstAsync<{ user_version: number }>('PRAGMA user_version;'))?.user_version ?? 0;
-        console.log(`Versão atual do banco: ${currentDbVersion}`);
+        //  LOG ADICIONADO
+        console.log(`LOG: Versão ATUAL do banco encontrada: ${currentDbVersion}`);
 
         const MIGRATIONS = [
             {
@@ -41,24 +45,34 @@ export const setupDatabase = async () => {
         ];
 
         const targetVersion = MIGRATIONS.length;
+        // LOG ADICIONADO
+        console.log(`LOG: Versão ALVO do código: ${targetVersion}`);
+
         if (currentDbVersion >= targetVersion) {
-            console.log("Banco de dados já está na versão mais recente.");
+            console.log("LOG: Banco de dados já está na versão mais recente. Nenhuma migração a ser executada.");
             return;
         }
 
         for (let i = currentDbVersion; i < targetVersion; i++) {
             const migration = MIGRATIONS[i];
-            console.log(`- Aplicando migração para a versão ${migration.version}...`);
+            // LOG ADICIONADO
+            console.log(`LOG: --- Preparando para aplicar migração versão ${migration.version}...`);
+            
             await db.withTransactionAsync(async () => {
                 for (const query of migration.queries) {
+                    //LOG ADICIONADO
+                    console.log(`LOG: Executando query: "${query}"`);
                     await db.execAsync(query);
                 }
             });
+
             await db.execAsync(`PRAGMA user_version = ${migration.version};`);
-            console.log(`- Banco de dados atualizado para a versão ${migration.version}`);
+            // LOG ADICIONADO
+            console.log(`LOG: --- Migração versão ${migration.version} aplicada com SUCESSO.`);
         }
     } catch (error) {
-        console.error("Erro crítico durante a migração do banco de dados:", error);
+        // LOG ADICIONADO
+        console.error("LOG: ERRO CRÍTICO DURANTE A MIGRAÇÃO:", error);
         throw new Error("Falha ao configurar o banco de dados do aplicativo.");
     }
 };
@@ -68,7 +82,7 @@ export const inserirVendaCompleta = async (venda: Venda) => {
     await db.withTransactionAsync(async () => {
         await db.runAsync(
             'INSERT INTO vendas (id, idCliente, clienteNome, clienteTelefone, dataVenda, valorTotal, subtotal, desconto, tipoPagamento, parcelasTotais, parcelasPagas, dataPrimeiraParcela) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);',
-            venda.id, venda.idCliente, venda.clienteNome, venda.clienteTelefone, venda.dataVenda, venda.valorTotal, venda.subtotal, venda.desconto, venda.tipoPagamento, venda.parcelasTotais, venda.parcelasPagas, venda.dataPrimeiraParcela
+            venda.id, venda.idCliente, venda.clienteNome, venda.clienteTelefone || null, venda.dataVenda, venda.valorTotal, venda.subtotal, venda.desconto || null, venda.tipoPagamento, venda.parcelasTotais || null, venda.parcelasPagas || null, venda.dataPrimeiraParcela || null
         );
         if (venda.itens) {
             for (const item of venda.itens) {
@@ -85,8 +99,7 @@ export const inserirVendaCompleta = async (venda: Venda) => {
     });
 };
 
-
-// --- Funções CRUD para Clientes ---
+// --- Funções CRUD
 export const listarClientesSQLite = async (): Promise<Cliente[]> => await db.getAllAsync<Cliente>('SELECT * FROM clientes ORDER BY nome ASC');
 export const cadastrarClienteSQLite = async (cliente: Cliente) => {
     await db.runAsync(`INSERT INTO clientes (id, nome, telefone, email, endereco) VALUES (?, ?, ?, ?, ?) ON CONFLICT(id) DO UPDATE SET nome = excluded.nome, telefone = excluded.telefone, email = excluded.email, endereco = excluded.endereco;`,
@@ -95,9 +108,6 @@ export const cadastrarClienteSQLite = async (cliente: Cliente) => {
 export const excluirClienteSQLite = async (idCliente: string) => await db.runAsync('DELETE FROM clientes WHERE id = ?;', idCliente);
 export const buscarClientePorIdSQLite = async (id: string): Promise<Cliente | null> => await db.getFirstAsync<Cliente>('SELECT * FROM clientes WHERE id = ?;', id);
 export const pesquisarClientesPorNomeSQLite = async (termo: string): Promise<Cliente[]> => await db.getAllAsync<Cliente>('SELECT * FROM clientes WHERE nome LIKE ? ORDER BY nome ASC;', `%${termo}%`);
-
-
-// --- Funções CRUD para Vendas e Pagamentos ---
 export const cadastrarVendaSQLite = async (venda: Omit<Venda, 'id' | 'clienteNome' | 'clienteTelefone' | 'itens' | 'pagamentos'> & { idCliente: string, itens: Omit<ItemVenda, 'idVenda'>[] }): Promise<Venda> => {
     const cliente = await buscarClientePorIdSQLite(venda.idCliente);
     if (!cliente) throw new Error("Cliente não encontrado para realizar a venda.");
@@ -144,9 +154,45 @@ export const listarVendaPorIdSQLite = async (idVenda: string): Promise<Venda | n
     }
     return venda;
 };
+
+export const listarVendasPorPeriodoSQLite = async (dataInicio: string, dataFim: string): Promise<Venda[]> => {
+    // A query busca vendas cuja data esteja entre o início e o fim do período
+    const vendas = await db.getAllAsync<Venda>(
+        'SELECT * FROM vendas WHERE dataVenda >= ? AND dataVenda <= ? ORDER BY dataVenda DESC',
+        dataInicio, 
+        dataFim
+    );
+
+    if (vendas.length === 0) return [];
+
+    // O resto da lógica para buscar itens e pagamentos é a mesma das outras funções
+    const vendaIds = vendas.map(v => v.id);
+    const placeholders = vendaIds.map(() => '?').join(',');
+
+    const todosItens = await db.getAllAsync<ItemVenda>(`SELECT * FROM itens_venda WHERE idVenda IN (${placeholders})`, ...vendaIds);
+    const todosPagamentos = await db.getAllAsync<Pagamento>(`SELECT * FROM pagamentos WHERE idVenda IN (${placeholders})`, ...vendaIds);
+
+    return vendas.map(venda => ({
+        ...venda,
+        itens: todosItens.filter(item => item.idVenda === venda.id),
+        pagamentos: todosPagamentos.filter(p => p.idVenda === venda.id)
+    }));
+};
+
 export const excluirVendaSQLite = async (idVenda: string) => await db.runAsync('DELETE FROM vendas WHERE id = ?;', idVenda);
 export const registrarPagamentoSQLite = async (idVenda: string, valor: number, dataPagamento: string) => await db.runAsync('INSERT INTO pagamentos (id, idVenda, dataPagamento, valorPago) VALUES (?, ?, ?, ?);', Crypto.randomUUID(), idVenda, dataPagamento, valor);
 export const excluirPagamentoSQLite = async (idPagamento: string) => await db.runAsync('DELETE FROM pagamentos WHERE id = ?;', idPagamento);
+export const listarPagamentosSQLite = async (idVenda: string): Promise<Pagamento[]> => {
+    try {
+        return await db.getAllAsync<Pagamento>(
+            'SELECT * FROM pagamentos WHERE idVenda = ? ORDER BY dataPagamento ASC',
+            idVenda
+        );
+    } catch (error) {
+        console.error(`Erro ao listar pagamentos para a venda ${idVenda}:`, error);
+        return []; // Retorna um array vazio em caso de erro
+    }
+};
 export const atualizarVendaSQLite = async (venda: Partial<Pick<Venda, 'id' | 'parcelasPagas'>>) => {
     if (venda.id && venda.parcelasPagas !== undefined) {
         await db.runAsync('UPDATE vendas SET parcelasPagas = ? WHERE id = ?;', venda.parcelasPagas, venda.id);
@@ -157,51 +203,29 @@ export const buscarVendasComVencimentoHojeSQLite = async (): Promise<Venda[]> =>
     const query = `
         SELECT * FROM vendas 
         WHERE 
-            (
-                tipoPagamento = 'Parcelado' AND 
-                DATE(dataPrimeiraParcela, '+' || (parcelasPagas) || ' month') = DATE(?)
-            ) 
+            ( tipoPagamento = 'Parcelado' AND DATE(dataPrimeiraParcela, '+' || (parcelasPagas) || ' month') = DATE(?) ) 
             OR 
-            (
-                tipoPagamento = 'À Vista' AND 
-                DATE(dataVenda, '+30 day') = DATE(?)
-            )
+            ( tipoPagamento = 'À Vista' AND DATE(dataVenda, '+30 day') = DATE(?) )
     `;
     const vendasIncompletas = await db.getAllAsync<Venda>(query, hoje, hoje);
     if (vendasIncompletas.length === 0) return [];
-
-    const vendasCompletas = await Promise.all(
-        vendasIncompletas.map(v => listarVendaPorIdSQLite(v.id))
-    );
-    
+    const vendasCompletas = await Promise.all(vendasIncompletas.map(v => listarVendaPorIdSQLite(v.id)));
     return vendasCompletas.filter((v): v is Venda => {
         if (!v) return false;
         const totalPago = v.pagamentos?.reduce((acc, p) => acc + p.valorPago, 0) || 0;
         return v.valorTotal > totalPago;
     });
 };
-
-
-// --- Funções CRUD para Usuários ---
-export const obterTodosUsuariosSQLite = async (): Promise<Usuario[]> => {
-    return await db.getAllAsync<Usuario>('SELECT * FROM usuarios ORDER BY username ASC;');
-};
-export const buscarUsuarioPorUsernameSQLite = async (username: string): Promise<Usuario | null> => {
-    return await db.getFirstAsync<Usuario>('SELECT * FROM usuarios WHERE username = ? COLLATE NOCASE;', username);
-};
+export const obterTodosUsuariosSQLite = async (): Promise<Usuario[]> => await db.getAllAsync<Usuario>('SELECT * FROM usuarios ORDER BY username ASC;');
+export const buscarUsuarioPorUsernameSQLite = async (username: string): Promise<Usuario | null> => await db.getFirstAsync<Usuario>('SELECT * FROM usuarios WHERE username = ? COLLATE NOCASE;', username);
 export const adicionarOuAtualizarUsuarioSQLite = async (usuario: Usuario): Promise<void> => {
-    await db.runAsync(
-        'INSERT INTO usuarios (username, passwordHash) VALUES (?, ?) ON CONFLICT(username) DO UPDATE SET passwordHash = excluded.passwordHash;',
-        usuario.username, usuario.passwordHash
-    );
+    await db.runAsync('INSERT INTO usuarios (username, passwordHash) VALUES (?, ?) ON CONFLICT(username) DO UPDATE SET passwordHash = excluded.passwordHash;',
+        usuario.username, usuario.passwordHash);
 };
 export const excluirUsuarioSQLite = async (username: string): Promise<boolean> => {
     const result = await db.runAsync('DELETE FROM usuarios WHERE username = ?;', username);
     return result.changes > 0;
 };
-
-
-// --- FUNÇÕES CRUD PARA PRODUTOS ---
 export const listarProdutosSQLite = async (): Promise<Produto[]> => await db.getAllAsync<Produto>('SELECT * FROM produtos ORDER BY descricao ASC');
 export const cadastrarProdutoSQLite = async (produto: Produto) => {
     await db.runAsync(

@@ -45,12 +45,12 @@ export interface Venda {
 export interface Usuario {
   username: string;
   passwordHash: string;
+  
 }
 
 export interface Produto {
   id: string;
   descricao: string;
-  marca: string;
-  quantidadeEstoque: number;
+  marca?: string;
   valor: number;
 }

@@ -4,12 +4,14 @@ import { View, Text, TouchableOpacity, StyleSheet, ImageBackground, SafeAreaView
 import { useRouter, useLocalSearchParams, Href } from 'expo-router';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import * as Linking from 'expo-linking';
+import Constants from 'expo-constants';
 
 type IconName = React.ComponentProps<typeof MaterialCommunityIcons>['name'];
 const ADMIN_USERNAME = "stherezo";
 
 export default function ConfiguracoesScreen() {
     const router = useRouter();
+    const appVersion = Constants.expoConfig?.version;
     const { username: rawUsername } = useLocalSearchParams() as { username?: string | string[] };
     const loggedInUsername = (Array.isArray(rawUsername) ? rawUsername[0] : rawUsername)?.toLowerCase();
     const isAdmin = loggedInUsername === ADMIN_USERNAME.toLowerCase();
@@ -28,7 +30,13 @@ export default function ConfiguracoesScreen() {
     // ESTRUTURA DOS BOTÕES: usa 'onPress'
     const configButtons: { title: string; icon: IconName; color: string; onPress: () => void; adminOnly: boolean }[] = [
         { title: 'Backup e Restauração', icon: 'database-export-outline', color: '#FFCC80', onPress: () => router.push('/Backup'), adminOnly: false },
-        { title: 'Gerenciar Usuários', icon: 'account-cog-outline', color: '#FFCC80', onPress: () => router.push('/Cadastrousuario'), adminOnly: true },
+        { 
+            title: 'Gerenciar Usuários', 
+            icon: 'account-cog-outline', 
+            color: '#FFCC80', 
+            onPress: () => router.push({ pathname: '/Cadastrousuario', params: { username: loggedInUsername } }), 
+            adminOnly: true 
+        },
         { title: 'Fale Conosco / Suporte', icon: 'email-outline', color: '#81D4FA', onPress: handleFaleConosco, adminOnly: false },
         { title: 'Sobre o Aplicativo', icon: 'information-outline', color: '#BDBDBD', onPress: () => router.push('/Sobre'), adminOnly: false },
     ];
@@ -62,6 +70,11 @@ export default function ConfiguracoesScreen() {
                         }
                         return null;
                     })}
+                    {appVersion && (
+                                            <Text style={styles.versionText}>
+                                                Versão {appVersion}
+                                            </Text>
+                                        )}
                 </ScrollView>
             </SafeAreaView>
         </ImageBackground>
@@ -96,5 +109,12 @@ const styles = StyleSheet.create({
         color: 'white',
         fontSize: 18,
         fontWeight: '500',
+    },
+     versionText: {
+        textAlign: 'center',
+        color: 'rgba(255, 255, 255, 0.4)',
+        fontSize: 12,
+        marginTop: 20,
+        paddingBottom: 10,
     },
 });

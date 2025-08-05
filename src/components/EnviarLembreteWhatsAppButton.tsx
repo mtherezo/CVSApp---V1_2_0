@@ -1,3 +1,4 @@
+// EnviarLembreteWhatsAppButton.tsx
 import React from 'react';
 import { TouchableOpacity, Text, Linking, Alert, StyleSheet, StyleProp, ViewStyle } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';

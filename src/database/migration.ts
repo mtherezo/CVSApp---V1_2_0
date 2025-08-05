@@ -1,7 +1,10 @@
+// src/database/migration.ts
 import AsyncStorage from '@react-native-async-storage/async-storage';
-// Esta importação agora deve funcionar, pois você restaurou a pasta 'storage'
+// Supondo que você criou este arquivo para ler os dados do jeito antigo
 import { listarClientesAntigos, listarVendasAntigas } from '../storage/asyncStorage.helpers'; 
-import { db, inserirCliente } from './sqlite';
+
+// IMPORTA AS FUNÇÕES CORRETAS DO SQLITE
+import { db, cadastrarClienteSQLite, inserirVendaCompleta as inserirVendaCompletaSQLite } from './sqlite';
 import * as Crypto from 'expo-crypto';
 
 const NOME_DA_BANDEIRA_DE_MIGRACAO = 'migracao_sqlite_v1_concluida';
@@ -11,44 +14,38 @@ export const executarMigracaoDeDados = async () => {
     const migracaoJaFeita = await AsyncStorage.getItem(NOME_DA_BANDEIRA_DE_MIGRACAO);
     if (migracaoJaFeita === 'true') {
       // A migração de DADOS para este usuário já foi feita, então não fazemos nada.
+      console.log("Migração de dados já foi realizada. Nenhuma ação necessária.");
       return;
     }
     
     console.log("MIGRAÇÃO DE DADOS: Iniciando migração de dados do AsyncStorage para SQLite...");
 
+    // Lê os dados do sistema antigo (AsyncStorage)
+    const clientesAntigos = await listarClientesAntigos();
+    const vendasAntigas = await listarVendasAntigas();
+
+    // Se não há absolutamente nenhum dado antigo, não há o que migrar.
+    if (clientesAntigos.length === 0 && vendasAntigas.length === 0) {
+        console.log("Nenhum dado antigo encontrado para migrar.");
+        await AsyncStorage.setItem(NOME_DA_BANDEIRA_DE_MIGRACAO, 'true');
+        return;
+    }
+
     // A transação principal garante que toda a migração seja "tudo ou nada".
     await db.withTransactionAsync(async () => {
-      // Lê os dados do sistema antigo (AsyncStorage)
-      const clientesAntigos = await listarClientesAntigos();
-      const vendasAntigas = await listarVendasAntigas();
-
       if (clientesAntigos && clientesAntigos.length > 0) {
         console.log(`MIGRAÇÃO DE DADOS: Migrando ${clientesAntigos.length} clientes...`);
         for (const cliente of clientesAntigos) {
-          await inserirCliente(cliente);
+          // ✨ 2. CHAMA A FUNÇÃO COM O NOME CORRETO
+          await cadastrarClienteSQLite(cliente);
         }
       }
 
       if (vendasAntigas && vendasAntigas.length > 0) {
         console.log(`MIGRAÇÃO DE DADOS: Migrando ${vendasAntigas.length} vendas...`);
         for (const venda of vendasAntigas) {
-          // Inserimos os dados da venda diretamente aqui para evitar transações aninhadas
-          await db.runAsync(
-            'INSERT INTO vendas (id, idCliente, clienteNome, clienteTelefone, dataVenda, valorTotal, subtotal, desconto, tipoPagamento, parcelasTotais, parcelasPagas, dataPrimeiraParcela) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);',
-            venda.id, venda.idCliente, venda.clienteNome, venda.clienteTelefone, venda.dataVenda, venda.valorTotal, venda.subtotal, venda.desconto, venda.tipoPagamento, venda.parcelasTotais, venda.parcelasPagas, venda.dataPrimeiraParcela
-          );
-          if (venda.itens) {
-            for (const item of venda.itens) {
-              await db.runAsync('INSERT INTO itens_venda (id, idVenda, descricao, quantidade, valor) VALUES (?, ?, ?, ?, ?);',
-                  item.id || Crypto.randomUUID(), venda.id, item.descricao, item.quantidade, item.valor);
-            }
-          }
-          if (venda.pagamentos) {
-            for (const pagamento of venda.pagamentos) {
-              await db.runAsync('INSERT INTO pagamentos (id, idVenda, dataPagamento, valorPago) VALUES (?, ?, ?, ?);',
-                  pagamento.id || Crypto.randomUUID(), venda.id, pagamento.dataPagamento, pagamento.valorPago);
-            }
-          }
+          // ✨ 3. REFINAMENTO: Usa a função centralizada para inserir a venda completa
+          await inserirVendaCompletaSQLite(venda);
         }
       }
     });

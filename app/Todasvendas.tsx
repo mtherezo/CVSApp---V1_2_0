@@ -1,18 +1,6 @@
+// Todasvendas.tsx
 import React, { useState, useCallback, useMemo } from 'react';
-import {
-    View,
-    Text,
-    FlatList,
-    StyleSheet,
-    TouchableOpacity,
-    Alert,
-    ImageBackground,
-    ActivityIndicator,
-    RefreshControl,
-    Platform,
-    SafeAreaView,
-    StatusBar,
-} from 'react-native';
+import { View, Text, FlatList, StyleSheet, TouchableOpacity, Alert, ImageBackground, ActivityIndicator, RefreshControl, Platform, SafeAreaView, StatusBar,} from 'react-native';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { listarTodasVendasSQLite, excluirVendaSQLite } from '../src/database/sqlite';
 import { Venda } from '../src/types';

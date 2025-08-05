@@ -1,3 +1,4 @@
+// Cadastrousuario.tsx
 import React, { useState, useCallback } from 'react';
 import {
     View, Text, FlatList, StyleSheet, TouchableOpacity, Alert, ImageBackground,
@@ -12,20 +13,27 @@ import {
     excluirUsuarioSQLite as excluirUsuario,
     buscarUsuarioPorUsernameSQLite
 } from '../src/database/sqlite';
-//import { obterTodosUsuarios, adicionarOuAtualizarUsuario, excluirUsuario, buscarUsuarioPorUsernameSQLite } from '../src/storage/usuarioStorage';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import CryptoJS from "crypto-js";
 import PasswordPromptModal from '../src/components/PasswordPromptModal';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+
+// DEFINE A INTERFACE PARA AS PROPRIEDADES DO FORMULÁRIO
+interface FormularioUsuarioProps {
+    usuarioEditando: Usuario | null;
+    onSave: (dados: { username: string; password?: string }) => void;
+    onCancel: () => void;
+    isSaving: boolean;
+}
 
 // Componente para o Formulário de Usuário
-const FormularioUsuario = ({ usuarioEditando, onSave, onCancel, isSaving }) => {
+const FormularioUsuario = ({ usuarioEditando, onSave, onCancel, isSaving }: FormularioUsuarioProps) => { // ✨ 2. APLICA A INTERFACE AQUI
     const [username, setUsername] = useState(usuarioEditando?.username || '');
     const [password, setPassword] = useState('');
     const [confirmPassword, setConfirmPassword] = useState('');
     const isEditing = !!usuarioEditando;
 
     const handleSave = () => {
-        // Validações
         if (!username.trim()) {
             Alert.alert('Atenção', 'O nome de usuário é obrigatório.');
             return;
@@ -46,7 +54,7 @@ const FormularioUsuario = ({ usuarioEditando, onSave, onCancel, isSaving }) => {
     };
 
     return (
-        <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{ padding: 20 }}>
+        <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={styles.formScrollContainer}>
             <Text style={styles.formTitle}>{isEditing ? 'Editar Usuário' : 'Novo Usuário'}</Text>
             <TextInput
                 style={[styles.input, isEditing && styles.disabledInput]}
@@ -55,7 +63,7 @@ const FormularioUsuario = ({ usuarioEditando, onSave, onCancel, isSaving }) => {
                 onChangeText={setUsername}
                 placeholderTextColor="#A9A9AA"
                 autoCapitalize="none"
-                editable={!isEditing} // Não permite editar o nome de usuário
+                editable={!isEditing}
             />
             <TextInput
                 style={styles.input}
@@ -91,18 +99,16 @@ export default function GerenciarUsuariosScreen() {
     const [isLoading, setIsLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
     const [termoBusca, setTermoBusca] = useState('');
-
     const [mostrarFormulario, setMostrarFormulario] = useState(false);
     const [usuarioEditando, setUsuarioEditando] = useState<Usuario | null>(null);
     const [isSaving, setIsSaving] = useState(false);
-
-    // Estados para controlar o modal de confirmação de senha
     const [isPromptVisible, setIsPromptVisible] = useState(false);
     const [isVerifyingPassword, setIsVerifyingPassword] = useState(false);
     const [usuarioParaExcluir, setUsuarioParaExcluir] = useState<Usuario | null>(null);
 
     const router = useRouter();
     const { username: loggedInUsername } = useLocalSearchParams<{ username?: string }>();
+    const insets = useSafeAreaInsets();
 
     const carregarUsuarios = async (showLoader = true) => {
         if (showLoader) setIsLoading(true);
@@ -124,23 +130,35 @@ export default function GerenciarUsuariosScreen() {
         setRefreshing(false);
     }, []);
 
-    const handleSalvarUsuario = async ({ username, password }) => {
+    const handleSalvarUsuario = async ({ username, password }: { username: string, password?: string }) => {
+        const trimmedUsername = username.trim();
         setIsSaving(true);
         try {
-            let passwordHash = usuarioEditando?.passwordHash;
+            if (!usuarioEditando) {
+                const usuarioExistente = await buscarUsuarioPorUsernameSQLite(trimmedUsername);
+                if (usuarioExistente) {
+                    Alert.alert("Erro", "Este nome de usuário já existe. Por favor, escolha outro.");
+                    setIsSaving(false);
+                    return;
+                }
+            }
+            let passwordHash;
             if (password) {
                 passwordHash = CryptoJS.SHA256(password).toString();
+            } else if (usuarioEditando) {
+                passwordHash = usuarioEditando.passwordHash;
+            } else {
+                setIsSaving(false);
+                return;
             }
-
             const usuarioParaSalvar: Usuario = {
-                username: username.trim(),
-                passwordHash: passwordHash!,
+                username: trimmedUsername,
+                passwordHash: passwordHash,
             };
-
             await adicionarOuAtualizarUsuario(usuarioParaSalvar);
-            
             await carregarUsuarios(false);
             setMostrarFormulario(false);
+            setUsuarioEditando(null);
         } catch (error) {
             Alert.alert('Erro ao Salvar', 'Não foi possível salvar o usuário.');
         } finally {
@@ -148,7 +166,6 @@ export default function GerenciarUsuariosScreen() {
         }
     };
 
-    // Função de exclusão agora abre o modal de senha
     const handleConfirmarExclusao = (usuario: Usuario) => {
         if (usuarios.length <= 1) {
             Alert.alert("Ação não permitida", "Não é possível excluir o único usuário do sistema.");
@@ -162,29 +179,22 @@ export default function GerenciarUsuariosScreen() {
         setIsPromptVisible(true);
     };
 
-    // Nova função para verificar a senha e prosseguir com a exclusão
     const handlePasswordSubmit = async (password: string) => {
         if (!password || !loggedInUsername || !usuarioParaExcluir) {
             setIsPromptVisible(false);
             return;
         }
-
         setIsVerifyingPassword(true);
         try {
             const adminUser = await buscarUsuarioPorUsernameSQLite(loggedInUsername);
             if (!adminUser) throw new Error("Usuário admin não encontrado.");
-
             const passwordHashDigitado = CryptoJS.SHA256(password).toString();
-
             if (passwordHashDigitado === adminUser.passwordHash) {
                 setIsPromptVisible(false);
-                Alert.alert(
-                    'Confirmar Exclusão Final',
-                    `Senha confirmada. Deseja realmente excluir o usuário "${usuarioParaExcluir.username}"?`,
+                Alert.alert('Confirmar Exclusão Final', `Senha confirmada. Deseja realmente excluir o usuário "${usuarioParaExcluir.username}"?`,
                     [
                         { text: 'Cancelar', style: 'cancel', onPress: () => setUsuarioParaExcluir(null) },
-                        {
-                            text: 'Excluir', style: 'destructive',
+                        { text: 'Excluir', style: 'destructive',
                             onPress: async () => {
                                 await excluirUsuario(usuarioParaExcluir.username);
                                 await carregarUsuarios(false);
@@ -248,7 +258,7 @@ export default function GerenciarUsuariosScreen() {
                     <FormularioUsuario
                         usuarioEditando={usuarioEditando}
                         onSave={handleSalvarUsuario}
-                        onCancel={() => setMostrarFormulario(false)}
+                        onCancel={() => { setMostrarFormulario(false); setUsuarioEditando(null); }}
                         isSaving={isSaving}
                     />
                 ) : (
@@ -267,10 +277,10 @@ export default function GerenciarUsuariosScreen() {
                             keyExtractor={(item) => item.username}
                             renderItem={renderItemUsuario}
                             ListEmptyComponent={<View style={styles.emptyContainer}><Text style={styles.emptyText}>Nenhum usuário encontrado.</Text></View>}
-                            contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 100 }}
+                            contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 120 }}
                             refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#FFFFFF" />}
                         />
-                        <View style={styles.footer}>
+                        <View style={[styles.footer, { paddingBottom: insets.bottom > 0 ? insets.bottom + 10 : 20 }]}>
                             <TouchableOpacity style={styles.addButton} onPress={() => { setUsuarioEditando(null); setMostrarFormulario(true); }}>
                                 <MaterialCommunityIcons name="plus" size={24} color="#FFFFFF" />
                                 <Text style={styles.addButtonText}>Novo Usuário</Text>
@@ -307,9 +317,18 @@ const styles = StyleSheet.create({
     cardTitle: { flex: 1, fontSize: 18, fontWeight: 'bold', color: '#FFFFFF', marginLeft: 15 },
     cardActions: { flexDirection: 'row' },
     actionButton: { padding: 8, marginLeft: 10 },
-    footer: { padding: 20, borderTopWidth: 1, borderTopColor: 'rgba(255, 255, 255, 0.1)' },
+    footer: {
+        paddingTop: 20,
+        paddingHorizontal: 20,
+        borderTopWidth: 1,
+        borderTopColor: 'rgba(255, 255, 255, 0.1)',
+        backgroundColor: 'rgba(25, 10, 50, 0.85)'
+    },
     addButton: { backgroundColor: '#4CAF50', flexDirection: 'row', paddingVertical: 15, borderRadius: 25, alignItems: 'center', justifyContent: 'center' },
     addButtonText: { color: 'white', fontSize: 17, fontWeight: 'bold', marginLeft: 10 },
+    formScrollContainer: {
+        padding: 20,
+    },
     formTitle: { fontSize: 22, fontWeight: 'bold', color: '#FFFFFF', marginBottom: 20, textAlign: 'center' },
     input: { backgroundColor: 'rgba(0,0,0,0.25)', borderRadius: 12, padding: 15, fontSize: 16, color: '#FFFFFF', marginBottom: 15 },
     disabledInput: { backgroundColor: 'rgba(0,0,0,0.15)', color: '#999' },

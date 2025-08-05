@@ -1,16 +1,6 @@
+// Home.tsx
 import { useLocalSearchParams, useRouter, Href } from "expo-router";
-import {
-    ImageBackground,
-    View,
-    Text,
-    TouchableOpacity,
-    StyleSheet,
-    Platform,
-    SafeAreaView,
-    ScrollView,
-    Alert,
-    StatusBar
-} from "react-native";
+import { ImageBackground, View, Text, TouchableOpacity, StyleSheet, Platform, SafeAreaView, ScrollView, Alert, StatusBar} from "react-native";
 import React from 'react';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import Constants from 'expo-constants';

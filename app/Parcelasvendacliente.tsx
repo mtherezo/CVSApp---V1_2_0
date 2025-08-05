@@ -1,28 +1,9 @@
+// Parcelasvendacliente.tsx
 import React, { useEffect, useState, useCallback } from 'react';
-import {
-    View,
-    Text,
-    TouchableOpacity,
-    StyleSheet,
-    TextInput,
-    Alert,
-    ImageBackground,
-    ActivityIndicator,
-    RefreshControl,
-    Platform,
-    SafeAreaView,
-    FlatList,
-    StatusBar,
-    KeyboardAvoidingView,
-} from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, TextInput, Alert, ImageBackground, ActivityIndicator, RefreshControl, Platform, SafeAreaView, FlatList, StatusBar, KeyboardAvoidingView,} from 'react-native';
 import { useLocalSearchParams, useRouter, useFocusEffect } from 'expo-router';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import {
-    listarVendaPorIdSQLite,
-    registrarPagamentoSQLite,
-    excluirPagamentoSQLite,
-    atualizarVendaSQLite,
-} from '../src/database/sqlite';
+import { listarVendaPorIdSQLite, registrarPagamentoSQLite, excluirPagamentoSQLite, atualizarVendaSQLite,} from '../src/database/sqlite';
 import { Pagamento, Venda } from '../src/types';
 import DateTimePicker, { DateTimePickerEvent } from '@react-native-community/datetimepicker';
 

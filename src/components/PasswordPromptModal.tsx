@@ -1,4 +1,4 @@
-// src/components/PasswordPromptModal.tsx
+// PasswordPromptModal.tsx
 import React, { useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, Modal, StyleSheet, ActivityIndicator } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
