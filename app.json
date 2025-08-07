@@ -2,7 +2,7 @@
   "expo": {
     "name": "CVSApp",
     "slug": "CVSApp",
-    "version": "3.0.0",
+    "version": "3.0.2",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "cvsapp",
@@ -21,11 +21,13 @@
         "backgroundColor": "#ffffff"
       },
       "package": "com.seunome.cvsapp",
-      "versionCode": 5,
+      "versionCode": 7,
       "permissions": [
         "READ_EXTERNAL_STORAGE",
         "WRITE_EXTERNAL_STORAGE",
-        "ACCESS_MEDIA_LOCATION"
+        "ACCESS_MEDIA_LOCATION",
+        "RECEIVE_BOOT_COMPLETED",
+        "CAMERA"
       ],
       "queries": [
         {
@@ -47,7 +49,8 @@
       "expo-web-browser",
       "expo-sqlite",
       "expo-document-picker",
-      "expo-font"
+      "expo-font",
+      "expo-image-picker"
     ],
     "experiments": {
       "typedRoutes": true

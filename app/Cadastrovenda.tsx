@@ -1,19 +1,23 @@
-// app/Cadastrovenda.tsx
 import React, { useState, useCallback, useEffect } from 'react';
 import {
     View, Text, TextInput, TouchableOpacity, StyleSheet, Alert, ImageBackground,
     Platform, KeyboardAvoidingView, ActivityIndicator, ScrollView, SafeAreaView, StatusBar, FlatList
 } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
-import { cadastrarVenda, editarVenda, listarVendaPorId } from '../src/storage/vendasStorage';
-import { listarProdutos } from '../src/storage/produtosStorage';
+import { 
+    cadastrarVendaSQLite as cadastrarVenda, 
+    editarVendaSQLite as editarVenda, 
+    listarVendaPorIdSQLite as listarVendaPorId,
+    listarProdutosSQLite as listarProdutos,
+    atualizarEstoqueProdutoSQLite
+} from '../src/database/sqlite';
 import { Venda, ItemVenda, Produto } from '../src/types';
 import * as Crypto from 'expo-crypto';
 import DateTimePicker, { DateTimePickerEvent } from '@react-native-community/datetimepicker';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 
 // Componente Memoizado para itens da venda (sem alterações)
-const MemoizedItemAdicionado = React.memo(({ item, onRemove }: { item: Omit<ItemVenda, 'idVenda'>, onRemove: (id: string) => void }) => {
+const MemoizedItemAdicionado = React.memo(({ item, onRemove }: { item: ItemVenda, onRemove: (id: string) => void }) => {
     const subtotalItem = item.valor * item.quantidade;
     return (
         <View style={styles.itemAdicionado}>
@@ -28,29 +32,14 @@ const MemoizedItemAdicionado = React.memo(({ item, onRemove }: { item: Omit<Item
     );
 });
 
-// ✨ ALTERADO: O componente do catálogo agora tem lógica de busca interna
+// Componente do catálogo agora mostra o stock
 const CatalogoProdutosView = ({ produtos, onSelect, onClose }: { produtos: Produto[], onSelect: (produto: Produto) => void, onClose: () => void }) => {
-    // Estado para o termo da busca e para a lista filtrada
     const [termoBusca, setTermoBusca] = useState('');
-    const [produtosFiltrados, setProdutosFiltrados] = useState(produtos);
-
-    // Efeito que filtra os produtos sempre que o termo de busca muda
-    useEffect(() => {
-        if (termoBusca.trim() === '') {
-            setProdutosFiltrados(produtos); // Se a busca estiver vazia, mostra todos
-        } else {
-            const filtrados = produtos.filter(produto =>
-                produto.descricao.toLowerCase().startsWith(termoBusca.toLowerCase())
-            );
-            setProdutosFiltrados(filtrados); // Mostra os produtos filtrados
-        }
-    }, [termoBusca, produtos]);
+    const produtosFiltrados = produtos.filter(p => p.descricao.toLowerCase().includes(termoBusca.toLowerCase()));
 
     return (
         <View style={styles.catalogoContainer}>
             <Text style={styles.catalogoTitle}>Selecione um Produto</Text>
-            
-            {/* ✨ NOVO: Campo de busca adicionado */}
             <View style={styles.buscaContainer}>
                 <MaterialCommunityIcons name="magnify" size={22} color="#A9A9A9" style={styles.buscaIcon} />
                 <TextInput
@@ -61,21 +50,21 @@ const CatalogoProdutosView = ({ produtos, onSelect, onClose }: { produtos: Produ
                     onChangeText={setTermoBusca}
                 />
             </View>
-
             <FlatList
-                data={produtosFiltrados} // ✨ ALTERADO: Usa a lista filtrada
+                data={produtosFiltrados}
                 keyExtractor={(item) => item.id}
                 renderItem={({ item }) => (
                     <TouchableOpacity style={styles.productListItem} onPress={() => onSelect(item)}>
-                        <Text style={styles.productListItemDesc}>{item.descricao}</Text>
-                        <Text style={styles.productListItemValue}>{`R$ ${item.valor.toFixed(2)}`}</Text>
+                        <View style={{flex: 1}}>
+                            <Text style={styles.productListItemDesc}>{item.descricao}</Text>
+                            <Text style={styles.productListItemValue}>{`R$ ${item.valor.toFixed(2)}`}</Text>
+                        </View>
+                        <Text style={[styles.productStockText, (item.quantidadeEstoque || 0) <= 0 && styles.outOfStockText]}>
+                            Stock: {item.quantidadeEstoque || 0}
+                        </Text>
                     </TouchableOpacity>
                 )}
-                ListEmptyComponent={
-                    <Text style={styles.emptyListText}>
-                        {termoBusca ? 'Nenhum produto encontrado.' : 'Nenhum produto no catálogo.'}
-                    </Text>
-                }
+                ListEmptyComponent={<Text style={styles.emptyListText}>{termoBusca ? 'Nenhum produto encontrado.' : 'Nenhum produto no catálogo.'}</Text>}
                 style={{ maxHeight: 250 }}
                 keyboardShouldPersistTaps="handled"
             />
@@ -94,8 +83,8 @@ export default function CadastroVendaScreen() {
 
     const [catalogoProdutos, setCatalogoProdutos] = useState<Produto[]>([]);
     const [catalogoVisivel, setCatalogoVisivel] = useState(false);
-
-    const [itens, setItens] = useState<Omit<ItemVenda, 'idVenda'>[]>([]);
+    const [itens, setItens] = useState<ItemVenda[]>([]);
+    const [produtoIdSelecionado, setProdutoIdSelecionado] = useState<string | null>(null);
     const [itemDescricao, setItemDescricao] = useState('');
     const [itemValor, setItemValor] = useState('');
     const [itemQuantidade, setItemQuantidade] = useState('1');
@@ -112,6 +101,7 @@ export default function CadastroVendaScreen() {
 
     useEffect(() => {
         const carregarDadosIniciais = async () => {
+            setIsLoadingData(true);
             try {
                 const produtosDoCatalogo = await listarProdutos();
                 setCatalogoProdutos(produtosDoCatalogo);
@@ -147,6 +137,7 @@ export default function CadastroVendaScreen() {
     const totalFinal = Math.max(0, subtotal - valorDesconto);
 
     const handleSelecionarProduto = (produto: Produto) => {
+        setProdutoIdSelecionado(produto.id);
         setItemDescricao(produto.descricao);
         setItemValor(produto.valor.toString().replace('.', ','));
         setCatalogoVisivel(false);
@@ -159,8 +150,10 @@ export default function CadastroVendaScreen() {
             Alert.alert("Atenção", "Preencha a descrição, quantidade e um valor válido para o produto.");
             return;
         }
-        const novoItem: Omit<ItemVenda, 'idVenda'> = {
+        const novoItem: ItemVenda = {
             id: Crypto.randomUUID(),
+            idVenda: idVenda || '',
+            idProduto: produtoIdSelecionado || undefined,
             descricao: itemDescricao.trim(),
             quantidade: quantidadeNum,
             valor: valorNum,
@@ -169,6 +162,7 @@ export default function CadastroVendaScreen() {
         setItemDescricao('');
         setItemValor('');
         setItemQuantidade('1');
+        setProdutoIdSelecionado(null);
     };
 
     const handleRemoverItem = useCallback((id: string) => {
@@ -176,64 +170,66 @@ export default function CadastroVendaScreen() {
     }, []);
 
     const handleSalvarVenda = async () => {
-        if (!idCliente) {
-            Alert.alert("Erro Crítico", "A referência do cliente foi perdida.");
-            return;
-        }
-        if (itens.length === 0) {
-            Alert.alert("Atenção", "Adicione pelo menos um produto à venda.");
-            return;
-        }
-        if (valorDesconto > subtotal) {
-            Alert.alert("Erro", "O desconto não pode ser maior que o subtotal da venda.");
-            return;
-        }
-        const quantidadeParcelasNum = parseInt(quantidadeParcelas, 10);
-        if (tipoPagamento === 'Parcelado' && (isNaN(quantidadeParcelasNum) || quantidadeParcelasNum <= 1)) {
-            Alert.alert('Atenção', 'Para pagamento parcelado, a quantidade de parcelas deve ser 2 ou mais.');
-            return;
-        }
+        if (!idCliente) { Alert.alert("Erro Crítico", "ID do cliente perdido."); return; }
+        if (itens.length === 0) { Alert.alert("Atenção", "Adicione pelo menos um item."); return; }
         
         setIsSaving(true);
-        let sucesso = false;
         try {
-            if (isEditing && vendaOriginal) {
-                const vendaEditada: Venda = {
-                    ...vendaOriginal,
-                    itens: itens as ItemVenda[],
-                    subtotal: subtotal,
-                    valorTotal: totalFinal,
-                    desconto: valorDesconto > 0 ? valorDesconto : undefined,
-                    tipoPagamento: tipoPagamento,
-                    dataVenda: dataVenda.toISOString(),
-                    parcelasTotais: tipoPagamento === 'Parcelado' ? quantidadeParcelasNum : undefined,
-                    dataPrimeiraParcela: tipoPagamento === 'Parcelado' ? dataPrimeiraParcela.toISOString() : undefined,
-                };
-                sucesso = await editarVenda(vendaEditada);
-            } else {
-                const dadosNovaVenda: Omit<Venda, 'id'> = {
-                    idCliente: idCliente!, clienteNome: clienteNome!, clienteTelefone: clienteTelefone || '',
-                    itens: itens as ItemVenda[], subtotal: subtotal, valorTotal: totalFinal,
-                    dataVenda: dataVenda.toISOString(), tipoPagamento,
-                    ...(valorDesconto > 0 && { desconto: valorDesconto }),
-                    ...(tipoPagamento === 'Parcelado' && {
-                        parcelasTotais: quantidadeParcelasNum, parcelasPagas: 0,
-                        dataPrimeiraParcela: dataPrimeiraParcela.toISOString(),
-                    }),
-                };
-                const vendaCadastrada = await cadastrarVenda(dadosNovaVenda);
-                sucesso = !!vendaCadastrada;
+            // --- 1. VERIFICAÇÃO DE STOCK ---
+            for (const itemVenda of itens) {
+                if (itemVenda.idProduto) { // Só verifica stock de produtos do catálogo
+                    const produtoCatalogo = catalogoProdutos.find(p => p.id === itemVenda.idProduto);
+                    const estoqueDisponivel = produtoCatalogo?.quantidadeEstoque || 0;
+                    const quantidadeOriginal = vendaOriginal?.itens.find(i => i.idProduto === itemVenda.idProduto)?.quantidade || 0;
+                    
+                    if (itemVenda.quantidade > estoqueDisponivel + quantidadeOriginal) {
+                        throw new Error(`Stock insuficiente para "${itemVenda.descricao}". Disponível: ${estoqueDisponivel}.`);
+                    }
+                }
             }
 
-            if (sucesso) {
-                Alert.alert('Sucesso', `Venda ${isEditing ? 'atualizada' : 'cadastrada'} com sucesso!`);
-                router.back();
-            } else {
-                Alert.alert('Erro', `Não foi possível ${isEditing ? 'atualizar' : 'cadastrar'} a venda.`);
+            // --- 2. CALCULA MUDANÇAS NO STOCK ---
+            const mudancasEstoque = new Map<string, number>();
+            if (isEditing && vendaOriginal) {
+                vendaOriginal.itens.forEach(item => {
+                    if (item.idProduto) {
+                        mudancasEstoque.set(item.idProduto, (mudancasEstoque.get(item.idProduto) || 0) + item.quantidade);
+                    }
+                });
             }
-        } catch (error) {
-            console.error(`Falha ao ${isEditing ? 'editar' : 'cadastrar'} venda (catch na tela):`, error);
-            Alert.alert('Erro Inesperado', `Ocorreu um erro ao tentar ${isEditing ? 'editar' : 'cadastrar'} a venda.`);
+            itens.forEach(item => {
+                if (item.idProduto) {
+                    mudancasEstoque.set(item.idProduto, (mudancasEstoque.get(item.idProduto) || 0) - item.quantidade);
+                }
+            });
+
+            // --- 3. SALVA A VENDA ---
+            let vendaSalva: Venda | null = null;
+            const quantidadeParcelasNum = parseInt(quantidadeParcelas, 10);
+            if (isEditing && vendaOriginal) {
+                const vendaEditada: Venda = { ...vendaOriginal, itens, subtotal, valorTotal: totalFinal, desconto: valorDesconto > 0 ? valorDesconto : undefined, tipoPagamento, dataVenda: dataVenda.toISOString(), parcelasTotais: tipoPagamento === 'Parcelado' ? quantidadeParcelasNum : undefined, dataPrimeiraParcela: tipoPagamento === 'Parcelado' ? dataPrimeiraParcela.toISOString() : undefined };
+                await editarVenda(vendaEditada);
+                vendaSalva = vendaEditada;
+            } else {
+                const dadosNovaVenda: Omit<Venda, 'id'> = { idCliente, clienteNome: clienteNome!, clienteTelefone, itens, subtotal, valorTotal: totalFinal, desconto: valorDesconto > 0 ? valorDesconto : undefined, dataVenda: dataVenda.toISOString(), tipoPagamento, ...(tipoPagamento === 'Parcelado' && { parcelasTotais: quantidadeParcelasNum, parcelasPagas: 0, dataPrimeiraParcela: dataPrimeiraParcela.toISOString() }) };
+                vendaSalva = await cadastrarVenda(dadosNovaVenda);
+            }
+
+            if (!vendaSalva) throw new Error("Falha ao salvar a venda.");
+
+            // --- 4. ATUALIZA O STOCK NO BANCO DE DADOS ---
+            for (const [idProduto, quantidade] of mudancasEstoque.entries()) {
+                if (quantidade !== 0) {
+                    await atualizarEstoqueProdutoSQLite(idProduto, quantidade);
+                }
+            }
+
+            Alert.alert('Sucesso', `Venda ${isEditing ? 'atualizada' : 'cadastrada'} com sucesso!`);
+            router.back();
+
+        } catch (error: any) {
+            console.error(`Falha ao ${isEditing ? 'editar' : 'cadastrar'} venda:`, error);
+            Alert.alert('Erro Inesperado', error.message || `Ocorreu um erro ao ${isEditing ? 'editar' : 'cadastrar'} a venda.`);
         } finally {
             setIsSaving(false);
         }
@@ -241,16 +237,12 @@ export default function CadastroVendaScreen() {
 
     const onChangeDataVenda = (event: DateTimePickerEvent, selectedDate?: Date) => {
         setShowDatePickerVenda(Platform.OS === 'ios');
-        if (selectedDate) {
-            setDataVenda(selectedDate);
-        }
+        if (selectedDate) setDataVenda(selectedDate);
     };
     
     const onChangeDataParcela = (event: DateTimePickerEvent, selectedDate?: Date) => {
         setMostrarDataPickerParcela(Platform.OS === 'ios');
-        if (selectedDate) {
-            setDataPrimeiraParcela(selectedDate);
-        }
+        if (selectedDate) setDataPrimeiraParcela(selectedDate);
     };
 
     if (isLoadingData) {
@@ -288,11 +280,7 @@ export default function CadastroVendaScreen() {
                                     <Text style={styles.sectionTitle}>1. Adicionar Itens</Text>
                                     
                                     {catalogoVisivel ? (
-                                        <CatalogoProdutosView
-                                            produtos={catalogoProdutos}
-                                            onSelect={handleSelecionarProduto}
-                                            onClose={() => setCatalogoVisivel(false)}
-                                        />
+                                        <CatalogoProdutosView produtos={catalogoProdutos} onSelect={handleSelecionarProduto} onClose={() => setCatalogoVisivel(false)} />
                                     ) : (
                                         <>
                                             <TouchableOpacity style={styles.selectProductButton} onPress={() => setCatalogoVisivel(true)}>
@@ -300,7 +288,6 @@ export default function CadastroVendaScreen() {
                                                 <Text style={styles.selectProductButtonText}>Selecionar Produto do Catálogo</Text>
                                             </TouchableOpacity>
                                             <Text style={styles.orText}>- ou adicione um item avulso abaixo -</Text>
-
                                             <View style={styles.inputContainer}>
                                                 <MaterialCommunityIcons name="tag-outline" size={22} color="#A9A9A9" style={styles.inputIcon} />
                                                 <TextInput placeholder="Descrição do Produto Avulso" value={itemDescricao} onChangeText={setItemDescricao} placeholderTextColor="#A9A9A9" style={styles.input} />
@@ -312,7 +299,7 @@ export default function CadastroVendaScreen() {
                                         </>
                                     )}
                                     
-                                    <TouchableOpacity style={[styles.actionButton, styles.additemButton]} onPress={handleAdicionarItem} disabled={catalogoVisivel}>
+                                    <TouchableOpacity style={[styles.actionButton, styles.additemButton, catalogoVisivel && styles.disabledButton]} onPress={handleAdicionarItem} disabled={catalogoVisivel}>
                                         <MaterialCommunityIcons name="plus-circle-outline" size={22} color="#FFFFFF" />
                                         <Text style={styles.actionButtonText}>Adicionar Item</Text>
                                     </TouchableOpacity>
@@ -320,7 +307,6 @@ export default function CadastroVendaScreen() {
 
                                 <View style={styles.sectionContainer}>
                                     <Text style={styles.sectionTitle}>2. Resumo e Pagamento</Text>
-                                    
                                     <View style={styles.dateSelectorContainer}>
                                         <Text style={styles.dateSelectorLabel}>Data da Venda:</Text>
                                         <TouchableOpacity style={styles.datePickerButton} onPress={() => setShowDatePickerVenda(true)}>
@@ -329,7 +315,6 @@ export default function CadastroVendaScreen() {
                                         </TouchableOpacity>
                                     </View>
                                     {showDatePickerVenda && (<DateTimePicker value={dataVenda} mode="date" display="default" onChange={onChangeDataVenda} />)}
-
                                     {itens.length === 0 ? (<Text style={styles.emptyListText}>Nenhum item adicionado ainda.</Text>) : (<>
                                         {itens.map(item => (<MemoizedItemAdicionado key={item.id} item={item} onRemove={handleRemoverItem} />))}
                                         <View style={styles.resumoContainer}>
@@ -342,8 +327,7 @@ export default function CadastroVendaScreen() {
                                             <View style={styles.pagamentoContainer}><TouchableOpacity style={[styles.pagamentoBotao, tipoPagamento === 'À Vista' && styles.pagamentoSelecionado]} onPress={() => setTipoPagamento('À Vista')}><MaterialCommunityIcons name="cash" size={24} color={tipoPagamento === 'À Vista' ? "#FFF" : "#A9A9A9"} /><Text style={styles.textoBotaoPagamento}>À Vista</Text></TouchableOpacity><TouchableOpacity style={[styles.pagamentoBotao, tipoPagamento === 'Parcelado' && styles.pagamentoSelecionado]} onPress={() => setTipoPagamento('Parcelado')}><MaterialCommunityIcons name="credit-card-multiple-outline" size={24} color={tipoPagamento === 'Parcelado' ? "#FFF" : "#A9A9A9"} /><Text style={styles.textoBotaoPagamento}>Parcelado</Text></TouchableOpacity></View>
                                             {tipoPagamento === 'Parcelado' && (<View style={styles.parceladoContainer}><View style={[styles.inputContainer, {flex:1}]}><MaterialCommunityIcons name="format-list-numbered" size={22} color="#A9A9A9" style={styles.inputIcon} /><TextInput placeholder="Nº Parc." value={quantidadeParcelas} onChangeText={setQuantidadeParcelas} keyboardType="number-pad" style={styles.input} placeholderTextColor="#A9A9A9" /></View><TouchableOpacity style={[styles.inputContainer, {flex: 2, alignItems: 'center'}]} onPress={() => setMostrarDataPickerParcela(true)}><MaterialCommunityIcons name="calendar-range" size={22} color="#A9A9A9" style={styles.inputIcon} /><Text style={styles.dateInputText}>{dataPrimeiraParcela.toLocaleDateString('pt-BR')}</Text></TouchableOpacity>{mostrarDataPickerParcela && (<DateTimePicker value={dataPrimeiraParcela} mode="date" display="default" onChange={onChangeDataParcela} />)}</View>)}
                                         </View>
-                                    </>
-                                    )}
+                                    </>)}
                                 </View>
 
                                 <View style={styles.actionButtonsContainer}>
@@ -408,7 +392,7 @@ const styles = StyleSheet.create({
     actionButton: { flexDirection: 'row', paddingVertical: 15, borderRadius: 25, alignItems: 'center', justifyContent: 'center', elevation: 3 },
     saveButton: { backgroundColor: '#4CAF50' },
     loader: { marginVertical: 15 },
-    disabledButton: { backgroundColor: '#555', opacity: 0.7 },
+    disabledButton: { opacity: 0.7 },
     dateSelectorContainer: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20, paddingHorizontal: 5, borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.2)', paddingBottom: 20 },
     dateSelectorLabel: { fontSize: 16, color: '#E0E0FF', fontWeight: '500' },
     datePickerButton: { flexDirection: 'row', alignItems: 'center', backgroundColor: 'rgba(0, 0, 0, 0.25)', borderRadius: 12, paddingVertical: 10, paddingHorizontal: 15, borderWidth: 1, borderColor: 'rgba(255, 255, 255, 0.2)' },
@@ -418,58 +402,17 @@ const styles = StyleSheet.create({
     orText: { color: 'rgba(255,255,255,0.6)', textAlign: 'center', marginBottom: 20, fontStyle: 'italic' },
     loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
     loadingText: { color: 'white', marginTop: 10 },
-    catalogoContainer: {
-        backgroundColor: 'rgba(0, 0, 0, 0.2)',
-        borderRadius: 16,
-        padding: 15,
-        marginBottom: 15,
-    },
-    catalogoTitle: {
-        fontSize: 18,
-        fontWeight: 'bold',
-        color: '#FFFFFF',
-        marginBottom: 15,
-        textAlign: 'center',
-    },
-    productListItem: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        paddingVertical: 15,
-        borderBottomWidth: 1,
-        borderBottomColor: 'rgba(255,255,255,0.1)'
-    },
+    catalogoContainer: { backgroundColor: 'rgba(0, 0, 0, 0.2)', borderRadius: 16, padding: 15, marginBottom: 15, },
+    catalogoTitle: { fontSize: 18, fontWeight: 'bold', color: '#FFFFFF', marginBottom: 15, textAlign: 'center', },
+    productListItem: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 15, borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.1)' },
     productListItemDesc: { color: '#FFFFFF', fontSize: 16 },
-    productListItemValue: { color: '#E0E0E0', fontSize: 16 },
-    catalogoButton: {
-        padding: 14,
-        borderRadius: 12,
-        alignItems: 'center',
-        marginTop: 15
-    },
+    productListItemValue: { color: '#E0E0E0', fontSize: 14, marginTop: 2 },
+    productStockText: { color: '#FFCC80', fontSize: 14, fontWeight: 'bold', marginLeft: 10, },
+    outOfStockText: { color: '#F44336' },
+    catalogoButton: { padding: 14, borderRadius: 12, alignItems: 'center', marginTop: 15 },
     cancelButton: { backgroundColor: '#757575' },
-    catalogoButtonText: {
-        color: '#FFFFFF',
-        fontWeight: 'bold',
-        fontSize: 16
-    },
-    // Estilos para o campo de busca no catálogo
-    buscaContainer: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        backgroundColor: 'rgba(0, 0, 0, 0.25)',
-        borderRadius: 12,
-        borderWidth: 1,
-        borderColor: 'rgba(255, 255, 255, 0.2)',
-        paddingHorizontal: 10,
-        marginBottom: 15,
-    },
-    buscaIcon: {
-        marginRight: 8,
-    },
-    buscaInput: {
-        flex: 1,
-        paddingVertical: 12,
-        fontSize: 16,
-        color: '#FFFFFF',
-    },
+    catalogoButtonText: { color: '#FFFFFF', fontWeight: 'bold', fontSize: 16 },
+    buscaContainer: { flexDirection: 'row', alignItems: 'center', backgroundColor: 'rgba(0, 0, 0, 0.25)', borderRadius: 12, borderWidth: 1, borderColor: 'rgba(255, 255, 255, 0.2)', paddingHorizontal: 10, marginBottom: 15, },
+    buscaIcon: { marginRight: 8, },
+    buscaInput: { flex: 1, paddingVertical: 12, fontSize: 16, color: '#FFFFFF', },
 });

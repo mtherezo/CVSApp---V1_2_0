@@ -1,44 +1,97 @@
-// Produtos.tsx
 import React, { useState, useCallback } from 'react';
-import { View, Text, FlatList, StyleSheet, TouchableOpacity, Alert, ImageBackground, ActivityIndicator, RefreshControl, Platform, SafeAreaView, StatusBar, TextInput, KeyboardAvoidingView, ScrollView} from 'react-native';
+import { View, Text, FlatList, StyleSheet, TouchableOpacity, Alert, ImageBackground, ActivityIndicator, RefreshControl, Platform, SafeAreaView, StatusBar, TextInput, KeyboardAvoidingView, ScrollView, Image } from 'react-native';
 import { Produto } from '../src/types';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { listarProdutosSQLite, cadastrarProdutoSQLite, excluirProdutoSQLite } from '../src/database/sqlite';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import * as Crypto from 'expo-crypto';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import * as ImagePicker from 'expo-image-picker';
 
-//Interface para as propriedades do Formulário
+// --- Interfaces para as propriedades dos componentes ---
 interface FormularioProdutoProps {
   produtoEditando: Produto | null;
-  onSave: (dados: { descricao: string; valor: string; marca: string; }) => void;
+  onSave: (dados: Omit<Produto, 'id'>) => void;
   onCancel: () => void;
   isSaving: boolean;
 }
 
+interface ListaProdutosViewProps {
+    produtos: Produto[];
+    onRefresh: () => void;
+    refreshing: boolean;
+    onEdit: (produto: Produto) => void;
+    onDelete: (produto: Produto) => void;
+    onAddNew: () => void;
+}
+
+// --- Componente para o Formulário de Produto ---
 const FormularioProduto = ({ produtoEditando, onSave, onCancel, isSaving }: FormularioProdutoProps) => {
     const [descricao, setDescricao] = useState(produtoEditando?.descricao || '');
     const [valor, setValor] = useState(produtoEditando ? produtoEditando.valor.toString().replace('.', ',') : '');
     const [marca, setMarca] = useState(produtoEditando?.marca || '');
+    const [codigo, setCodigo] = useState(produtoEditando?.codigo || '');
+    const [quantidadeEstoque, setQuantidadeEstoque] = useState(produtoEditando?.quantidadeEstoque?.toString() || '0');
+    const [fotoUri, setFotoUri] = useState<string | null | undefined>(produtoEditando?.fotoUri);
+
+    const handleEscolherFoto = async () => {
+    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (status !== 'granted') {
+        Alert.alert('Permissão Necessária', 'É preciso permitir o acesso à galeria para escolher uma foto.');
+        return;
+    }
+
+    let result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: 'images',
+        allowsEditing: true,
+        aspect: [1, 1],
+        quality: 0.8,
+    });
+
+    if (!result.canceled) {
+        setFotoUri(result.assets[0].uri);
+    }
+};
 
     const handleSave = () => {
         if (!descricao.trim()) {
             Alert.alert('Atenção', 'A descrição do produto é obrigatória.');
             return;
         }
-        onSave({ descricao, valor, marca });
+        onSave({ 
+            descricao: descricao.trim(), 
+            valor: parseFloat(valor.replace(',', '.')) || 0, 
+            marca: marca.trim(), 
+            codigo: codigo.trim(),
+            quantidadeEstoque: parseInt(quantidadeEstoque, 10) || 0,
+            fotoUri: fotoUri || undefined
+        });
     };
 
     return (
-        <KeyboardAvoidingView
-            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-            style={styles.formContainer}
-        >
-            <ScrollView keyboardShouldPersistTaps="handled">
+        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.formContainer}>
+            <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={styles.formScrollContainer}>
                 <Text style={styles.formTitle}>{produtoEditando ? 'Editar Produto' : 'Novo Produto'}</Text>
-                <TextInput style={styles.input} placeholder="Descrição do Produto" value={descricao} onChangeText={setDescricao} placeholderTextColor="#A9A9A9" />
-                <TextInput style={styles.input} placeholder="Marca (opcional)" value={marca} onChangeText={setMarca} placeholderTextColor="#A9A9A9" autoCapitalize="words" />
-                <TextInput style={styles.input} placeholder="Valor (ex: 25,90)" value={valor} onChangeText={setValor} keyboardType="decimal-pad" placeholderTextColor="#A9A9A9" />
+                
+                <TouchableOpacity style={styles.imagePicker} onPress={handleEscolherFoto}>
+                    {fotoUri ? (
+                        <Image source={{ uri: fotoUri }} style={styles.productImage} />
+                    ) : (
+                        <View style={styles.imagePlaceholder}>
+                            <MaterialCommunityIcons name="camera-plus-outline" size={40} color="#A9A9A9" />
+                            <Text style={styles.imagePlaceholderText}>Adicionar Foto</Text>
+                        </View>
+                    )}
+                </TouchableOpacity>
+
+                <TextInput style={styles.input} placeholder="Descrição do Produto*" value={descricao} onChangeText={setDescricao} placeholderTextColor="#A9A9A9" />
+                <TextInput style={styles.input} placeholder="Marca" value={marca} onChangeText={setMarca} placeholderTextColor="#A9A9A9" autoCapitalize="words" />
+                <View style={styles.inputRow}>
+                    <TextInput style={[styles.input, {flex: 1}]} placeholder="Código" value={codigo} onChangeText={setCodigo} placeholderTextColor="#A9A9A9" />
+                    <TextInput style={[styles.input, {flex: 1}]} placeholder="Estoque" value={quantidadeEstoque} onChangeText={setQuantidadeEstoque} keyboardType="number-pad" placeholderTextColor="#A9A9A9" />
+                </View>
+                <TextInput style={styles.input} placeholder="Valor (R$)" value={valor} onChangeText={setValor} keyboardType="decimal-pad" placeholderTextColor="#A9A9A9" />
+                
                 <View style={styles.formActions}>
                     <TouchableOpacity style={[styles.formButton, styles.cancelButton]} onPress={onCancel} disabled={isSaving}>
                         <Text style={styles.formButtonText}>Cancelar</Text>
@@ -52,57 +105,37 @@ const FormularioProduto = ({ produtoEditando, onSave, onCancel, isSaving }: Form
     );
 };
 
-//Interface para as propriedades da Lista
-interface ListaProdutosViewProps {
-    produtos: Produto[];
-    onRefresh: () => void;
-    refreshing: boolean;
-    onEdit: (produto: Produto) => void;
-    onDelete: (produto: Produto) => void;
-    onAddNew: () => void;
-}
-
+// --- Componente para a Lista de Produtos ---
 const ListaProdutosView = ({ produtos, onRefresh, refreshing, onEdit, onDelete, onAddNew }: ListaProdutosViewProps) => {
     const insets = useSafeAreaInsets();
     const renderItemProduto = ({ item }: { item: Produto }) => (
         <View style={styles.card}>
+            {item.fotoUri ? (
+                <Image source={{ uri: item.fotoUri }} style={styles.cardImage} />
+            ) : (
+                <View style={styles.cardImagePlaceholder}>
+                    <MaterialCommunityIcons name="image-outline" size={30} color="#A9A9A9" />
+                </View>
+            )}
             <View style={styles.cardInfo}>
-                <Text style={styles.cardTitle}>{item.descricao}</Text>
+                <Text style={styles.cardTitle} numberOfLines={2}>{item.descricao}</Text>
                 {item.marca && <Text style={styles.cardSubtitle}>{item.marca}</Text>}
-                <Text style={styles.cardValue}>{`R$ ${item.valor.toFixed(2)}`}</Text>
+                <View style={styles.cardDetailsRow}>
+                    <Text style={styles.cardValue}>{`R$ ${item.valor.toFixed(2)}`}</Text>
+                    <Text style={styles.cardStock}>Estoque: {item.quantidadeEstoque || 0}</Text>
+                </View>
             </View>
             <View style={styles.cardActions}>
-                <TouchableOpacity onPress={() => onEdit(item)} style={styles.actionButton}>
-                    <MaterialCommunityIcons name="pencil-outline" size={24} color="#FFC107" />
-                </TouchableOpacity>
-                <TouchableOpacity onPress={() => onDelete(item)} style={styles.actionButton}>
-                    <MaterialCommunityIcons name="delete-outline" size={24} color="#F44336" />
-                </TouchableOpacity>
+                <TouchableOpacity onPress={() => onEdit(item)} style={styles.actionButton}><MaterialCommunityIcons name="pencil-outline" size={24} color="#FFC107" /></TouchableOpacity>
+                <TouchableOpacity onPress={() => onDelete(item)} style={styles.actionButton}><MaterialCommunityIcons name="delete-outline" size={24} color="#F44336" /></TouchableOpacity>
             </View>
         </View>
     );
 
     return (
         <>
-            <FlatList
-                data={produtos}
-                keyExtractor={(item) => item.id}
-                renderItem={renderItemProduto}
-                ListEmptyComponent={
-                    <View style={styles.emptyContainer}>
-                        <MaterialCommunityIcons name="package-variant-closed" size={60} color="rgba(255,255,255,0.3)" />
-                        <Text style={styles.emptyText}>Nenhum produto cadastrado.</Text>
-                    </View>
-                }
-                contentContainerStyle={styles.listContentContainer}
-                refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#FFFFFF" />}
-            />
-            <View style={[styles.footer, { paddingBottom: insets.bottom > 0 ? insets.bottom + 10 : 20 }]}>
-                <TouchableOpacity style={styles.addButton} onPress={onAddNew}>
-                    <MaterialCommunityIcons name="plus" size={24} color="#FFFFFF" />
-                    <Text style={styles.addButtonText}>Novo Produto</Text>
-                </TouchableOpacity>
-            </View>
+            <FlatList data={produtos} keyExtractor={(item) => item.id} renderItem={renderItemProduto} ListEmptyComponent={<View style={styles.emptyContainer}><MaterialCommunityIcons name="package-variant-closed" size={60} color="rgba(255,255,255,0.3)" /><Text style={styles.emptyText}>Nenhum produto cadastrado.</Text></View>} contentContainerStyle={styles.listContentContainer} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#FFFFFF" />} />
+            <View style={[styles.footer, { paddingBottom: insets.bottom > 0 ? insets.bottom + 10 : 20 }]}><TouchableOpacity style={styles.addButton} onPress={onAddNew}><MaterialCommunityIcons name="plus" size={24} color="#FFFFFF" /><Text style={styles.addButtonText}>Novo Produto</Text></TouchableOpacity></View>
         </>
     );
 };
@@ -122,74 +155,44 @@ export default function ProdutosScreen() {
         try {
             const dados = await listarProdutosSQLite();
             setProdutos(dados);
-        } catch (error) {
-            console.error('Falha ao carregar produtos:', error);
-            Alert.alert('Erro', 'Não foi possível carregar o catálogo de produtos.');
-        } finally {
+        } catch (error) { console.error('Falha ao carregar produtos:', error); Alert.alert('Erro', 'Não foi possível carregar o catálogo de produtos.'); } finally {
             if (showLoader) setIsLoading(false);
         }
     };
 
-    const onRefresh = useCallback(async () => {
-        setRefreshing(true);
-        await carregarProdutos(false);
-        setRefreshing(false);
-    }, []);
-
+    const onRefresh = useCallback(async () => { setRefreshing(true); await carregarProdutos(false); setRefreshing(false); }, []);
     useFocusEffect(useCallback(() => { carregarProdutos(); }, []));
 
-    const handleAbrirFormularioNovo = () => {
-        setProdutoEditando(null);
-        setMostrarFormulario(true);
-    };
+    const handleAbrirFormularioNovo = () => { setProdutoEditando(null); setMostrarFormulario(true); };
+    const handleAbrirFormularioEditar = (produto: Produto) => { setProdutoEditando(produto); setMostrarFormulario(true); };
+    const handleFecharFormulario = () => { setMostrarFormulario(false); setProdutoEditando(null); };
 
-    const handleAbrirFormularioEditar = (produto: Produto) => {
-        setProdutoEditando(produto);
-        setMostrarFormulario(true);
-    };
-
-    const handleFecharFormulario = () => {
-        setMostrarFormulario(false);
-        setProdutoEditando(null);
-    };
-
-    const handleSalvarProduto = async ({ descricao, valor, marca }: { descricao: string; valor: string; marca: string; }) => {
-        const valorNum = parseFloat(valor.replace(',', '.')) || 0;
-        if (!descricao.trim()) {
-            Alert.alert('Atenção', 'A descrição do produto é obrigatória.');
-            return;
-        }
+    const handleSalvarProduto = async (dadosProduto: Omit<Produto, 'id'>) => {
         setIsSaving(true);
         try {
             const produtoParaSalvar: Produto = {
                 id: produtoEditando?.id || Crypto.randomUUID(),
-                descricao: descricao.trim(),
-                valor: valorNum,
-                marca: marca.trim() || undefined,
+                ...dadosProduto,
             };
             await cadastrarProdutoSQLite(produtoParaSalvar);
             await carregarProdutos(false);
             handleFecharFormulario();
         } catch (error: any) {
-            Alert.alert('Erro ao salvar', error.message || 'Não foi possível salvar o produto.');
+            if (error instanceof Error && error.message.includes('UNIQUE constraint failed: produtos.descricao')) {
+                Alert.alert('Erro', 'Já existe um produto com esta descrição.');
+            } else {
+                Alert.alert('Erro ao salvar', error.message || 'Não foi possível salvar o produto.');
+            }
         } finally {
             setIsSaving(false);
         }
     };
 
     const handleConfirmarExclusao = (produto: Produto) => {
-        Alert.alert(
-            'Confirmar Exclusão',
-            `Tem certeza que deseja excluir o produto "${produto.descricao}"?`,
-            [
-                { text: 'Cancelar', style: 'cancel' },
-                { text: 'Excluir', style: 'destructive',
-                    onPress: async () => {
-                        await excluirProdutoSQLite(produto.id);
-                        await carregarProdutos(false);
-                    }
-                }
-            ]
+        Alert.alert('Confirmar Exclusão', `Tem certeza que deseja excluir o produto "${produto.descricao}"?`,
+            [{ text: 'Cancelar', style: 'cancel' }, { text: 'Excluir', style: 'destructive',
+                onPress: async () => { await excluirProdutoSQLite(produto.id); await carregarProdutos(false); }
+            }]
         );
     };
 
@@ -210,23 +213,10 @@ export default function ProdutosScreen() {
                     <TouchableOpacity onPress={() => router.back()} style={styles.backButton}><MaterialCommunityIcons name="arrow-left" size={24} color="#FFFFFF" /></TouchableOpacity>
                     <Text style={styles.title}>Catálogo de Produtos</Text>
                 </View>
-                
                 {mostrarFormulario ? (
-                    <FormularioProduto
-                        produtoEditando={produtoEditando}
-                        onSave={handleSalvarProduto}
-                        onCancel={handleFecharFormulario}
-                        isSaving={isSaving}
-                    />
+                    <FormularioProduto produtoEditando={produtoEditando} onSave={handleSalvarProduto} onCancel={handleFecharFormulario} isSaving={isSaving} />
                 ) : (
-                    <ListaProdutosView
-                        produtos={produtos}
-                        onRefresh={onRefresh}
-                        refreshing={refreshing}
-                        onEdit={handleAbrirFormularioEditar}
-                        onDelete={handleConfirmarExclusao}
-                        onAddNew={handleAbrirFormularioNovo}
-                    />
+                    <ListaProdutosView produtos={produtos} onRefresh={onRefresh} refreshing={refreshing} onEdit={handleAbrirFormularioEditar} onDelete={handleConfirmarExclusao} onAddNew={handleAbrirFormularioNovo} />
                 )}
             </SafeAreaView>
         </ImageBackground>
@@ -245,23 +235,32 @@ const styles = StyleSheet.create({
     emptyContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', marginTop: '40%' },
     emptyText: { fontSize: 18, color: 'rgba(255,255,255,0.7)' },
     card: { backgroundColor: 'rgba(255, 255, 255, 0.1)', borderRadius: 12, padding: 15, marginBottom: 12, flexDirection: 'row', alignItems: 'center' },
-    cardInfo: { flex: 1 },
-    cardTitle: { fontSize: 18, fontWeight: 'bold', color: '#FFFFFF' },
-    cardSubtitle: { fontSize: 14, color: '#BDBDBD', marginTop: 4 },
-    cardValue: { fontSize: 16, color: '#E0E0FF', marginTop: 4 },
-    cardActions: { flexDirection: 'row' },
-    actionButton: { padding: 8, marginLeft: 10 },
+    cardImage: { width: 60, height: 60, borderRadius: 8, marginRight: 15, backgroundColor: 'rgba(0,0,0,0.2)' },
+    cardImagePlaceholder: { width: 60, height: 60, borderRadius: 8, marginRight: 15, backgroundColor: 'rgba(0,0,0,0.2)', justifyContent: 'center', alignItems: 'center' },
+    cardInfo: { flex: 1, justifyContent: 'center' },
+    cardTitle: { fontSize: 16, fontWeight: 'bold', color: '#FFFFFF' },
+    cardSubtitle: { fontSize: 14, color: '#BDBDBD', marginTop: 2 },
+    cardDetailsRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 8 },
+    cardValue: { fontSize: 16, color: '#E0E0FF', fontWeight: '500' },
+    cardStock: { fontSize: 14, color: '#FFCC80', fontWeight: 'bold' },
+    cardActions: { flexDirection: 'column', justifyContent: 'space-around', marginLeft: 10 },
+    actionButton: { padding: 8 },
     footer: { position: 'absolute', bottom: 0, left: 0, right: 0, paddingTop: 20, paddingHorizontal: 20, backgroundColor: 'rgba(25, 10, 50, 0.9)', borderTopWidth: 1, borderTopColor: 'rgba(255, 255, 255, 0.1)' },
     addButton: { backgroundColor: '#4CAF50', flexDirection: 'row', paddingVertical: 15, borderRadius: 25, alignItems: 'center', justifyContent: 'center' },
     addButtonText: { color: 'white', fontSize: 17, fontWeight: 'bold', marginLeft: 10 },
     formContainer: { flex: 1, },
+    formScrollContainer: { padding: 20 },
     formTitle: { fontSize: 22, fontWeight: 'bold', color: '#FFFFFF', marginBottom: 20, textAlign: 'center' },
+    imagePicker: { width: 120, height: 120, borderRadius: 12, backgroundColor: 'rgba(0,0,0,0.25)', alignSelf: 'center', marginBottom: 20, justifyContent: 'center', alignItems: 'center', overflow: 'hidden' },
+    productImage: { width: '100%', height: '100%' },
+    imagePlaceholder: { justifyContent: 'center', alignItems: 'center' },
+    imagePlaceholderText: { color: '#A9A9A9', marginTop: 5 },
     input: { backgroundColor: 'rgba(0,0,0,0.25)', borderRadius: 12, padding: 15, fontSize: 16, color: '#FFFFFF', marginBottom: 15 },
-    disabledButton: { opacity: 0.6 },
-    formButtonText: { color: '#FFFFFF', fontWeight: 'bold', fontSize: 16 },
+    inputRow: { flexDirection: 'row', gap: 10 },
     formActions: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 10 },
     formButton: { flex: 1, padding: 15, borderRadius: 12, alignItems: 'center' },
     cancelButton: { backgroundColor: '#555', marginRight: 10 },
     saveButton: { backgroundColor: '#4CAF50' },
-    disabledInput: { backgroundColor: 'rgba(0,0,0,0.15)', color: '#999' },
+    disabledButton: { opacity: 0.6 },
+    formButtonText: { color: '#FFFFFF', fontWeight: 'bold', fontSize: 16 },
 });

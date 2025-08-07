@@ -8,8 +8,8 @@ import * as DocumentPicker from 'expo-document-picker';
 import * as Updates from 'expo-updates';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { db } from '../src/database/sqlite';
-import * as MediaLibrary from 'expo-media-library'; // Importa a biblioteca de permissões
-
+import * as MediaLibrary from 'expo-media-library';
+import * as SQLite from 'expo-sqlite'; // Importa o SQLite para o teste de validação
 
 const DATABASE_NAME = "cvsapp.db"; 
 
@@ -21,7 +21,6 @@ export default function BackupScreen() {
     const handleBackup = async () => {
         if (isLoading) return;
 
-        // Pede permissão para acessar os arquivos
         const { status } = await MediaLibrary.requestPermissionsAsync();
         if (status !== 'granted') {
             Alert.alert("Permissão Negada", "É necessário permitir o acesso aos arquivos para criar um backup.");
@@ -42,14 +41,14 @@ export default function BackupScreen() {
 
             const date = new Date();
             const timestamp = `${date.getFullYear()}-${(date.getMonth() + 1).toString().padStart(2, '0')}-${date.getDate().toString().padStart(2, '0')}_${date.getHours().toString().padStart(2, '0')}-${date.getMinutes().toString().padStart(2, '0')}`;
-            const backupUri = `${FileSystem.cacheDirectory}backup-${timestamp}.db`;
+            const backupUri = `${FileSystem.cacheDirectory}backup-cvsapp-${timestamp}.db`;
             
             setStatusText('Copiando dados...');
             await FileSystem.copyAsync({ from: dbUri, to: backupUri });
 
             setStatusText('Compartilhando arquivo...');
             await Sharing.shareAsync(backupUri, {
-                mimeType: 'application/octet-stream', // MIME type genérico para melhor compatibilidade
+                mimeType: 'application/octet-stream',
                 dialogTitle: 'Salvar backup do banco de dados',
             });
             
@@ -57,7 +56,7 @@ export default function BackupScreen() {
 
         } catch (error) {
             console.error("Erro no backup:", error);
-            Alert.alert("Erro", "Não foi possível completar o backup. Verifique as permissões do aplicativo.");
+            Alert.alert("Erro", "Não foi possível completar o backup.");
         } finally {
             setIsLoading(false);
             setStatusText('');
@@ -69,46 +68,88 @@ export default function BackupScreen() {
 
         Alert.alert(
             "Restaurar Backup",
-            "ATENÇÃO: Isso substituirá TODOS os dados atuais do aplicativo pelos dados do backup. Esta ação não pode ser desfeita. Deseja continuar?",
+            "ATENÇÃO: Isso substituirá TODOS os dados atuais. Recomendamos fazer um backup antes de continuar. Deseja prosseguir?",
             [
                 { text: "Cancelar", style: "cancel" },
                 { 
-                    text: "Continuar", 
+                    text: "Prosseguir", 
                     style: "destructive",
                     onPress: async () => {
                         setIsLoading(true);
-                        setStatusText('Iniciando restauração...');
+                        
+                        const dbUri = `${FileSystem.documentDirectory}SQLite/${DATABASE_NAME}`;
+                        const emergencyBackupUri = `${FileSystem.documentDirectory}SQLite/emergency_backup.db`;
+                        let emergencyBackupCreated = false;
+
                         try {
+                            // PASSO 1: Fazer um backup de emergência do DB atual
+                            setStatusText('Criando backup de segurança...');
+                            await FileSystem.copyAsync({ from: dbUri, to: emergencyBackupUri });
+                            emergencyBackupCreated = true;
+
+                            // PASSO 2: Pedir ao usuário para escolher o arquivo de backup
+                            setStatusText('Selecione o arquivo de backup...');
                             const result = await DocumentPicker.getDocumentAsync({
-                                type: ['application/octet-stream', 'application/x-sqlite3'],
+                                type: ['application/octet-stream', 'application/x-sqlite3', '*/*'],
                                 copyToCacheDirectory: true,
                             });
                             
                             if (result.canceled || !result.assets?.[0]?.uri) {
-                                setIsLoading(false);
-                                setStatusText('');
-                                return;
+                                throw new Error("Seleção de arquivo cancelada.");
                             }
                             
                             const backupUri = result.assets[0].uri;
-                            const dbUri = `${FileSystem.documentDirectory}SQLite/${DATABASE_NAME}`;
 
-                            setStatusText('Fechando conexão atual...');
+                            setStatusText('Fechando conexão com o banco de dados...');
                             await db.closeAsync();
 
+                            // PASSO 3: Substituir o DB atual pelo backup
                             setStatusText('Restaurando dados...');
                             await FileSystem.copyAsync({ from: backupUri, to: dbUri });
 
-                            setStatusText('Aplicativo será reiniciado...');
+                            // PASSO 4: Tentar reabrir e validar o novo DB
+                            setStatusText('Validando o backup restaurado...');
+                            let testDb = null;
+                            try {
+                                testDb = SQLite.openDatabaseSync(DATABASE_NAME);
+                                // Tenta ler uma tabela que você sabe que deve existir
+                                await testDb.getFirstAsync('SELECT * FROM clientes LIMIT 1;'); 
+                            } catch (validationError) {
+                                throw new Error("O arquivo de backup é inválido ou incompatível com esta versão do aplicativo.");
+                            } finally {
+                                await testDb?.closeAsync();
+                            }
+
+                            // PASSO 5: Se tudo deu certo, reiniciar
+                            setStatusText('Restauração concluída! Reiniciando...');
                             Alert.alert(
                                 "Restauração Concluída!",
-                                "Os dados foram restaurados com sucesso. O aplicativo será reiniciado para aplicar as alterações.",
-                                [{ text: "OK", onPress: async () => await Updates.reloadAsync() }]
+                                "O aplicativo será reiniciado para aplicar as alterações.",
+                                [{ text: "OK", onPress: () => Updates.reloadAsync() }]
                             );
 
-                        } catch (error) {
-                            console.error("Erro na restauração:", error);
-                            Alert.alert("Erro", "Não foi possível restaurar o backup.");
+                        } catch (error: any) {
+                            console.error("ERRO NA RESTAURAÇÃO:", error);
+                            setStatusText('A restauração falhou. Revertendo...');
+
+                            // PASSO DE EMERGÊNCIA: Se algo deu errado, restaura o backup de segurança
+                            if (emergencyBackupCreated) {
+                                try {
+                                    // Fecha qualquer conexão que possa ter ficado aberta
+                                    await db.closeAsync().catch(() => {});
+                                    await FileSystem.copyAsync({ from: emergencyBackupUri, to: dbUri });
+                                } catch (restoreError) {
+                                    console.error("FALHA CRÍTICA AO REVERTER BACKUP:", restoreError);
+                                    Alert.alert("Erro Crítico", "Falha ao reverter a restauração. Pode ser necessário reinstalar o app.");
+                                }
+                            }
+                            
+                            Alert.alert("Restauração Falhou", `${error.message}. Seus dados originais foram mantidos.`);
+                            
+                            // Recarrega o app para se reconectar ao banco de dados original restaurado
+                            await Updates.reloadAsync();
+
+                        } finally {
                             setIsLoading(false);
                             setStatusText('');
                         }
@@ -236,7 +277,6 @@ const styles = StyleSheet.create({
         backgroundColor: 'rgba(0, 0, 0, 0.7)',
         justifyContent: 'center',
         alignItems: 'center',
-        borderRadius: 16, // Para ficar contido no card, se preferir
     },
     statusText: {
         marginTop: 15,
@@ -244,5 +284,4 @@ const styles = StyleSheet.create({
         fontWeight: '600',
         color: '#FFFFFF'
     }
-    
 });

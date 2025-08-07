@@ -36,7 +36,7 @@ export default function SobreScreen() {
                         
                         <View style={styles.infoBox}>
                             <Text style={styles.infoTitle}>Desenvolvido por:</Text>
-                            <Text style={styles.infoContent}>mthz informática</Text>
+                            <Text style={styles.infoContent}>Mthz.Dev</Text>
                         </View>
                     </View>
                 </ScrollView>

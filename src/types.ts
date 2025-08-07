@@ -1,6 +1,7 @@
 export interface ItemVenda {
   id: string;
   idVenda?: string;
+  idProduto?: string;
   descricao: string;
   valor: number;
   quantidade: number;
@@ -51,6 +52,9 @@ export interface Usuario {
 export interface Produto {
   id: string;
   descricao: string;
-  marca?: string;
   valor: number;
+  marca?: string;
+  codigo?: string;
+  quantidadeEstoque?: number;
+  fotoUri?: string;
 }
