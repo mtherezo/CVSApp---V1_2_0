@@ -7,7 +7,7 @@ import * as Sharing from 'expo-sharing';
 import * as DocumentPicker from 'expo-document-picker';
 import * as Updates from 'expo-updates';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { db } from '../src/database/sqlite';
+import { db } from '../../src/database/sqlite';
 import * as MediaLibrary from 'expo-media-library';
 import * as SQLite from 'expo-sqlite'; // Importa o SQLite para o teste de validação
 
@@ -161,7 +161,7 @@ export default function BackupScreen() {
 
     return (
         <ImageBackground
-            source={require("../assets/images/fundo.jpg")} 
+            source={require("../../assets/images/fundo.jpg")} 
             style={styles.background}
             blurRadius={2}
         >

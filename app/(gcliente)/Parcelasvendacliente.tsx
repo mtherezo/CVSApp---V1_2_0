@@ -3,8 +3,8 @@ import React, { useEffect, useState, useCallback } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, TextInput, Alert, ImageBackground, ActivityIndicator, RefreshControl, Platform, SafeAreaView, FlatList, StatusBar, KeyboardAvoidingView,} from 'react-native';
 import { useLocalSearchParams, useRouter, useFocusEffect } from 'expo-router';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { listarVendaPorIdSQLite, registrarPagamentoSQLite, excluirPagamentoSQLite, atualizarVendaSQLite,} from '../src/database/sqlite';
-import { Pagamento, Venda } from '../src/types';
+import { listarVendaPorIdSQLite, registrarPagamentoSQLite, excluirPagamentoSQLite, atualizarVendaSQLite,} from '../../src/database/sqlite';
+import { Pagamento, Venda } from '../../src/types';
 import DateTimePicker, { DateTimePickerEvent } from '@react-native-community/datetimepicker';
 
 const MemoizedPagamentoItem = React.memo(({ item, onExcluir, isDeleting, isSubmitting }: { item: Pagamento, onExcluir: (item: Pagamento) => void, isDeleting: boolean, isSubmitting: boolean }) => (
@@ -218,7 +218,7 @@ export default function ParcelasVendaClienteScreen() {
 
     if (isLoading) {
         return (
-            <ImageBackground source={require("../assets/images/fundo.jpg")} style={styles.background} blurRadius={2}>
+            <ImageBackground source={require("../../assets/images/fundo.jpg")} style={styles.background} blurRadius={2}>
                 <View style={styles.overlay} />
                 <View style={styles.loadingContainer}>
                     <ActivityIndicator size="large" color="#FFFFFF" />
@@ -229,7 +229,7 @@ export default function ParcelasVendaClienteScreen() {
     }
 
     return (
-        <ImageBackground source={require("../assets/images/fundo.jpg")} style={styles.background} blurRadius={2}>
+        <ImageBackground source={require("../../assets/images/fundo.jpg")} style={styles.background} blurRadius={2}>
             <View style={styles.overlay} />
             <SafeAreaView style={styles.safeArea}>
                 <View style={styles.headerContainer}>

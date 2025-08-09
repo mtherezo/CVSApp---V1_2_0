@@ -2,10 +2,10 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, ImageBackground, Alert, ActivityIndicator, ScrollView, KeyboardAvoidingView, Platform, StatusBar, SafeAreaView} from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
-import { Cliente } from '../src/types';
+import { Cliente } from '../../src/types';
 import * as Crypto from 'expo-crypto'; //expo-crypto para gerar IDs
 // Importações do storage antigo pelas novas do SQLite
-import { cadastrarClienteSQLite, buscarClientePorIdSQLite } from '../src/database/sqlite';
+import { cadastrarClienteSQLite, buscarClientePorIdSQLite } from '../../src/database/sqlite';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 
 export default function CadastroClienteScreen() {
@@ -90,7 +90,7 @@ export default function CadastroClienteScreen() {
   
   if (isLoadingData) {
     return (
-      <ImageBackground source={require("../assets/images/fundo.jpg")} style={styles.background} blurRadius={2}>
+      <ImageBackground source={require("../../assets/images/fundo.jpg")} style={styles.background} blurRadius={2}>
         <View style={styles.overlay} />
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color="#FFFFFF" />
@@ -102,7 +102,7 @@ export default function CadastroClienteScreen() {
 
   return (
     <ImageBackground
-      source={require("../assets/images/fundo.jpg")}
+      source={require("../../assets/images/fundo.jpg")}
       style={styles.background}
       blurRadius={2}
     >

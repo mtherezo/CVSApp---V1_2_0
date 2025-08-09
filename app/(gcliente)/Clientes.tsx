@@ -1,9 +1,9 @@
 //Clientes.tsx
 import React, { useState, useCallback } from 'react';
 import { View, Text, FlatList, StyleSheet, TouchableOpacity, Alert, ImageBackground, ActivityIndicator, RefreshControl, Platform, SafeAreaView, StatusBar,} from 'react-native';
-import { Cliente } from '../src/types';
+import { Cliente } from '../../src/types';
 import { useRouter, useFocusEffect } from 'expo-router';
-import { listarClientesSQLite, excluirClienteSQLite } from '../src/database/sqlite';
+import { listarClientesSQLite, excluirClienteSQLite } from '../../src/database/sqlite';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -102,7 +102,7 @@ export default function ClientesScreen() {
 
   if (isLoading && !refreshing) {
     return (
-      <ImageBackground source={require("../assets/images/fundo.jpg")} style={styles.background} blurRadius={2}>
+      <ImageBackground source={require("../../assets/images/fundo.jpg")} style={styles.background} blurRadius={2}>
         <View style={styles.overlay} />
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color="#FFFFFF" />
@@ -113,7 +113,7 @@ export default function ClientesScreen() {
   }
 
   return (
-    <ImageBackground source={require("../assets/images/fundo.jpg")} style={styles.background} blurRadius={2}>
+    <ImageBackground source={require("../../assets/images/fundo.jpg")} style={styles.background} blurRadius={2}>
       <View style={styles.overlay} />
       <SafeAreaView style={styles.safeArea}>
         <View style={styles.headerContainer}>

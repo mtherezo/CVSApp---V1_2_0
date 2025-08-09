@@ -58,19 +58,30 @@ function MainLayout() {
     <Stack screenOptions={{ headerShown: false }}>
       <Stack.Screen name="index" />
       <Stack.Screen name="Home" />
-      <Stack.Screen name="Clientes" />
-      <Stack.Screen name="Cadastrocliente" />
-      <Stack.Screen name="Cadastrousuario" />
-      <Stack.Screen name="Cadastrovenda" />
-      <Stack.Screen name="Gerarrelatorios" />
-      <Stack.Screen name="Parcelasvendacliente" />
-      <Stack.Screen name="Pesquisarvendascliente" />
-      <Stack.Screen name="Todasvendas" />
-      <Stack.Screen name="Vendascliente" /> 
-      <Stack.Screen name="Produtos" />
-      <Stack.Screen name="Configuracoes" />
-      <Stack.Screen name="Sobre" />
-      <Stack.Screen name="Backup" />
+      <Stack.Screen name="CadastroInicial" />
+      
+      {/* Grupo Cliente */}
+      <Stack.Screen name="(gcliente)/Clientes" />
+      <Stack.Screen name="(gcliente)/Cadastrocliente" />
+      <Stack.Screen name="(gcliente)/Vendascliente" />
+      <Stack.Screen name="(gcliente)/Parcelasvendacliente" />
+      
+      {/* Grupo Produto */}
+      <Stack.Screen name="(gproduto)/Produtos" />
+      
+      {/* Grupo Venda */}
+      <Stack.Screen name="(gvenda)/Todasvendas" />
+      <Stack.Screen name="(gvenda)/Cadastrovenda" />
+      <Stack.Screen name="(gvenda)/Pesquisarvendascliente" />
+      
+      {/* Grupo Relatório */}
+      <Stack.Screen name="(grelatorio)/Gerarrelatorios" />
+      
+      {/* Grupo Configurações */}
+      <Stack.Screen name="(gconfig)/Configuracoes" />
+      <Stack.Screen name="(gconfig)/Backup" />
+      <Stack.Screen name="(gconfig)/Sobre" />
+      <Stack.Screen name="(gconfig)/Cadastrousuario" />
     </Stack>
   );
 }

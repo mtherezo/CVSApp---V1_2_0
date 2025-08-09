@@ -1,15 +1,34 @@
-// Todasvendas.tsx
 import React, { useState, useCallback, useMemo } from 'react';
-import { View, Text, FlatList, StyleSheet, TouchableOpacity, Alert, ImageBackground, ActivityIndicator, RefreshControl, Platform, SafeAreaView, StatusBar,} from 'react-native';
+import {
+    View,
+    Text,
+    FlatList,
+    StyleSheet,
+    TouchableOpacity,
+    Alert,
+    ImageBackground,
+    ActivityIndicator,
+    RefreshControl,
+    Platform,
+    SafeAreaView,
+    StatusBar,
+} from 'react-native';
 import { useRouter, useFocusEffect } from 'expo-router';
-import { listarTodasVendasSQLite, excluirVendaSQLite } from '../src/database/sqlite';
-import { Venda } from '../src/types';
+import { listarTodasVendasSQLite, excluirVendaSQLite } from '../../src/database/sqlite';
+import { Venda } from '../../src/types';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
+
+// ✨ 1. Define os tipos de filtro possíveis
+type FiltroStatus = 'todas' | 'pendentes' | 'parciais' | 'quitadas';
 
 export default function TodasVendasScreen() {
     const [vendas, setVendas] = useState<Venda[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
+    
+    // ✨ 2. Adiciona o estado para controlar o filtro ativo
+    const [filtroAtivo, setFiltroAtivo] = useState<FiltroStatus>('todas');
+
     const router = useRouter();
 
     const carregarTodasVendasComLoading = async (showMainLoader = true) => {
@@ -37,30 +56,45 @@ export default function TodasVendasScreen() {
         }, [])
     );
 
-    const resumo = useMemo(() => {
-        let totalVendas = vendas.length;
-        let valorTotalVendido = 0;
-        let totalPagoAoConsultor = 0; 
-        let vendasQuitadas = 0;
-        
-        vendas.forEach(venda => {
-            valorTotalVendido += venda.valorTotal; 
-            const valorPagoNestaVenda = venda.pagamentos?.reduce((acc, p) => acc + p.valorPago, 0) || 0;
-            totalPagoAoConsultor += valorPagoNestaVenda;
-            if (valorPagoNestaVenda >= venda.valorTotal - 0.001) { 
-                vendasQuitadas++;
-            }
-        });
-
-        const valorPendenteDeRecebimento = valorTotalVendido - totalPagoAoConsultor;
-        const vendasPendentes = totalVendas - vendasQuitadas;
-
-        return { totalVendas, valorTotalVendido, totalPagoAoConsultor, valorPendenteDeRecebimento, vendasQuitadas, vendasPendentes };
-    }, [vendas]);
-
     const calcularValorPago = (venda: Venda): number => {
         return venda.pagamentos?.reduce((acc, p) => acc + p.valorPago, 0) || 0;
     };
+
+    // ✨ 3. Cria a lista de vendas filtradas
+    const vendasFiltradas = useMemo(() => {
+        if (filtroAtivo === 'todas') {
+            return vendas;
+        }
+        return vendas.filter(venda => {
+            const valorPago = calcularValorPago(venda);
+            const saldoDevedor = venda.valorTotal - valorPago;
+
+            if (filtroAtivo === 'pendentes') return valorPago === 0 && venda.valorTotal > 0;
+            if (filtroAtivo === 'parciais') return valorPago > 0 && saldoDevedor > 0.001;
+            if (filtroAtivo === 'quitadas') return saldoDevedor <= 0.001;
+            
+            return false;
+        });
+    }, [vendas, filtroAtivo]);
+
+    // ✨ O resumo agora calcula com base na lista filtrada
+    const resumo = useMemo(() => {
+        const listaParaResumo = filtroAtivo === 'todas' ? vendas : vendasFiltradas;
+        
+        let totalVendas = listaParaResumo.length;
+        let valorTotalVendido = 0;
+        let totalPagoAoConsultor = 0; 
+        
+        listaParaResumo.forEach(venda => {
+            valorTotalVendido += venda.valorTotal; 
+            totalPagoAoConsultor += calcularValorPago(venda);
+        });
+
+        const valorPendenteDeRecebimento = valorTotalVendido - totalPagoAoConsultor;
+
+        return { totalVendas, valorTotalVendido, totalPagoAoConsultor, valorPendenteDeRecebimento };
+    }, [vendas, vendasFiltradas, filtroAtivo]);
+
 
     const renderItemVenda = ({ item }: { item: Venda }) => {
         const valorPagoNestaVenda = calcularValorPago(item);
@@ -125,14 +159,14 @@ export default function TodasVendasScreen() {
                     <Text style={styles.title}>Histórico Geral</Text>
                 </View>
                 <View style={styles.resumoContainer}>
-                    <Text style={styles.resumoItem}>📦 Total de Vendas: {resumo.totalVendas}</Text>
-                    <Text style={styles.resumoItem}>💰 Valor Total Vendido: R$ {resumo.valorTotalVendido.toFixed(2)}</Text>
+                    <Text style={styles.resumoItem}>📦 Vendas Exibidas: {resumo.totalVendas}</Text>
+                    <Text style={styles.resumoItem}>💰 Valor Total: R$ {resumo.valorTotalVendido.toFixed(2)}</Text>
                     <Text style={styles.resumoItem}>✅ Total Recebido: R$ {resumo.totalPagoAoConsultor.toFixed(2)}</Text>
                     <Text style={styles.resumoItemPendente}>💸 Total Pendente: R$ {resumo.valorPendenteDeRecebimento.toFixed(2)}</Text>
                     
                     <View style={{marginTop: 15}}>
                         <View style={styles.progressoHeader}>
-                            <Text style={styles.progressoLabel}>Progresso Geral de Recebimentos</Text>
+                            <Text style={styles.progressoLabel}>Progresso de Recebimentos</Text>
                             <Text style={styles.progressoTexto}>{`${percentualPago.toFixed(1)}%`}</Text>
                         </View>
                         <View style={styles.progressoContainer}>
@@ -140,6 +174,27 @@ export default function TodasVendasScreen() {
                         </View>
                     </View>
                 </View>
+
+                {/*  Componente com os botões de filtro */}
+                <View style={styles.filtroContainer}>
+                    <TouchableOpacity 
+                        style={[styles.filtroBotao, filtroAtivo === 'todas' && styles.filtroBotaoAtivo]}
+                        onPress={() => setFiltroAtivo('todas')}
+                    ><Text style={styles.filtroTexto}>Todas</Text></TouchableOpacity>
+                    <TouchableOpacity 
+                        style={[styles.filtroBotao, filtroAtivo === 'pendentes' && styles.filtroBotaoAtivo]}
+                        onPress={() => setFiltroAtivo('pendentes')}
+                    ><Text style={styles.filtroTexto}>Pendentes</Text></TouchableOpacity>
+                    <TouchableOpacity 
+                        style={[styles.filtroBotao, filtroAtivo === 'parciais' && styles.filtroBotaoAtivo]}
+                        onPress={() => setFiltroAtivo('parciais')}
+                    ><Text style={styles.filtroTexto}>Parciais</Text></TouchableOpacity>
+                    <TouchableOpacity 
+                        style={[styles.filtroBotao, filtroAtivo === 'quitadas' && styles.filtroBotaoAtivo]}
+                        onPress={() => setFiltroAtivo('quitadas')}
+                    ><Text style={styles.filtroTexto}>Quitadas</Text></TouchableOpacity>
+                </View>
+
                 <Text style={styles.subTitle}>Lista de Vendas Individuais</Text>
             </>
         );
@@ -147,7 +202,7 @@ export default function TodasVendasScreen() {
 
     if (isLoading && !refreshing) {
         return (
-            <ImageBackground source={require("../assets/images/fundo.jpg")} style={styles.background} blurRadius={2}>
+            <ImageBackground source={require("../../assets/images/fundo.jpg")} style={styles.background} blurRadius={2}>
                 <View style={styles.overlay} />
                 <View style={styles.loadingContainer}>
                     <ActivityIndicator size="large" color="#FFFFFF" />
@@ -158,18 +213,23 @@ export default function TodasVendasScreen() {
     }
 
     return (
-        <ImageBackground source={require("../assets/images/fundo.jpg")} style={styles.background} blurRadius={2}>
+        <ImageBackground source={require("../../assets/images/fundo.jpg")} style={styles.background} blurRadius={2}>
             <View style={styles.overlay} />
             <SafeAreaView style={styles.safeArea}>
                 <FlatList
-                    data={vendas}
+                    data={vendasFiltradas} // Usa a lista filtrada
                     keyExtractor={(item) => item.id.toString()} 
                     renderItem={renderItemVenda}
                     ListHeaderComponent={ListHeaderComponent}
                     ListEmptyComponent={
                         <View style={styles.emptyListContainer}>
                             <MaterialCommunityIcons name="chart-bar-stacked" size={60} color="rgba(255,255,255,0.3)" />
-                            <Text style={styles.emptyListText}>Nenhuma venda registrada.</Text>
+                            <Text style={styles.emptyListText}>
+                                {vendas.length === 0 
+                                    ? "Nenhuma venda registrada." 
+                                    : "Nenhuma venda encontrada para este filtro."
+                                }
+                            </Text>
                         </View>
                     }
                     contentContainerStyle={vendas.length === 0 ? styles.emptyListContainerStyle : styles.listContentContainer}
@@ -197,39 +257,43 @@ const styles = StyleSheet.create({
         backgroundColor: 'rgba(0,0,0,0.4)', 
         padding: 18, 
         borderRadius: 16, 
-        marginBottom: 20,
+        marginBottom: 10, // Diminuído para dar espaço aos filtros
         marginHorizontal: 10,
     },
     resumoItem: { fontSize: 16, color: '#E0E0FF', marginBottom: 8, lineHeight: 22 },
     resumoItemPendente: { fontSize: 16, color: '#FFCC80', fontWeight: 'bold', marginBottom: 8, lineHeight: 22 },
     subTitle: { fontSize: 22, fontWeight: '600', marginBottom: 15, color: '#FFFFFF', textAlign: 'center' },
-    progressoHeader: {
+    progressoHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8, },
+    progressoLabel: { fontSize: 14, color: '#E0E0FF', fontWeight: '500', },
+    progressoTexto: { fontSize: 14, color: '#FFFFFF', fontWeight: 'bold', },
+    progressoContainer: { height: 12, backgroundColor: 'rgba(0,0,0,0.3)', borderRadius: 6, overflow: 'hidden', },
+    progressoBarra: { height: '100%', backgroundColor: '#4CAF50', borderRadius: 6, },
+    
+    // ESTILOS PARA OS FILTROS
+    filtroContainer: {
         flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        marginBottom: 8,
+        justifyContent: 'space-around',
+        paddingHorizontal: 16,
+        marginBottom: 20,
     },
-    progressoLabel: {
-        fontSize: 14,
-        color: '#E0E0FF',
-        fontWeight: '500',
+    filtroBotao: {
+        paddingVertical: 8,
+        paddingHorizontal: 16,
+        borderRadius: 20,
+        backgroundColor: 'rgba(255, 255, 255, 0.1)',
+        borderWidth: 1,
+        borderColor: 'rgba(255, 255, 255, 0.2)',
     },
-    progressoTexto: {
-        fontSize: 14,
+    filtroBotaoAtivo: {
+        backgroundColor: '#4186a7ff',
+        borderColor: '#81D4FA',
+    },
+    filtroTexto: {
         color: '#FFFFFF',
-        fontWeight: 'bold',
+        //fontWeight: 'bold',
+        fontSize: 13,
     },
-    progressoContainer: {
-        height: 12,
-        backgroundColor: 'rgba(0,0,0,0.3)',
-        borderRadius: 6,
-        overflow: 'hidden',
-    },
-    progressoBarra: {
-        height: '100%',
-        backgroundColor: '#4CAF50',
-        borderRadius: 6,
-    },
+
     cardVenda: {
         backgroundColor: 'rgba(255, 255, 255, 0.1)',
         padding: 15,
@@ -248,29 +312,10 @@ const styles = StyleSheet.create({
         borderTopWidth: 1,
         borderTopColor: 'rgba(255,255,255,0.1)',
     },
-    itemLinha: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        marginBottom: 5,
-    },
-    itemQuantidade: {
-        color: '#E0E0FF',
-        fontSize: 15,
-        fontWeight: 'bold',
-        marginRight: 8,
-        minWidth: 30,
-    },
-    itemDescricao: {
-        flex: 1,
-        color: '#E0E0E0',
-        fontSize: 15,
-    },
-    itemPreco: {
-        color: '#E0E0E0',
-        fontSize: 15,
-        fontWeight: '500',
-        marginLeft: 8,
-    },
+    itemLinha: { flexDirection: 'row', alignItems: 'center', marginBottom: 5, },
+    itemQuantidade: { color: '#E0E0FF', fontSize: 15, fontWeight: 'bold', marginRight: 8, minWidth: 30, },
+    itemDescricao: { flex: 1, color: '#E0E0E0', fontSize: 15, },
+    itemPreco: { color: '#E0E0E0', fontSize: 15, fontWeight: '500', marginLeft: 8, },
     detalhesFinanceiros: {
         borderTopWidth: 1,
         borderColor: 'rgba(255,255,255,0.15)',
@@ -285,19 +330,9 @@ const styles = StyleSheet.create({
     textoPendente: { color: '#FFAB91', fontWeight: 'bold' },
     textoDesconto: { color: '#FFCC80' },
     textoQuitado: { color: '#A5D6A7' },
-    labelTotalFinal: {
-        fontWeight: 'bold',
-    },
-    textoTotalFinal: {
-        fontWeight: 'bold',
-        fontSize: 16,
-    },
-    divisorFinanceiro: {
-        height: 1,
-        backgroundColor: 'rgba(255, 255, 255, 0.15)',
-        width: '100%',
-        marginVertical: 8,
-    },
+    labelTotalFinal: { fontWeight: 'bold', },
+    textoTotalFinal: { fontWeight: 'bold', fontSize: 16, },
+    divisorFinanceiro: { height: 1, backgroundColor: 'rgba(255, 255, 255, 0.15)', width: '100%', marginVertical: 8, },
     emptyListContainer: { justifyContent: 'center', alignItems: 'center', paddingTop: '20%' },
     emptyListText: { textAlign: 'center', fontSize: 18, fontWeight: 'bold', color: 'rgba(255,255,255,0.7)', marginTop: 15 },
 });

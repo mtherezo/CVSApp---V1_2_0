@@ -1,12 +1,15 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useMemo } from 'react';
 import { View, Text, FlatList, StyleSheet, TouchableOpacity, Alert, ImageBackground, ActivityIndicator, RefreshControl, Platform, SafeAreaView, StatusBar, TextInput, KeyboardAvoidingView, ScrollView, Image } from 'react-native';
-import { Produto } from '../src/types';
+import { Produto } from '../../src/types';
 import { useRouter, useFocusEffect } from 'expo-router';
-import { listarProdutosSQLite, cadastrarProdutoSQLite, excluirProdutoSQLite } from '../src/database/sqlite';
+import { listarProdutosSQLite, cadastrarProdutoSQLite, excluirProdutoSQLite } from '../../src/database/sqlite';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import * as Crypto from 'expo-crypto';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as ImagePicker from 'expo-image-picker';
+
+// Define os tipos de filtro de Estoque
+type FiltroEstoqueStatus = 'todos' | 'emEstoque' | 'semEstoque';
 
 // --- Interfaces para as propriedades dos componentes ---
 interface FormularioProdutoProps {
@@ -35,23 +38,23 @@ const FormularioProduto = ({ produtoEditando, onSave, onCancel, isSaving }: Form
     const [fotoUri, setFotoUri] = useState<string | null | undefined>(produtoEditando?.fotoUri);
 
     const handleEscolherFoto = async () => {
-    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (status !== 'granted') {
-        Alert.alert('Permissão Necessária', 'É preciso permitir o acesso à galeria para escolher uma foto.');
-        return;
-    }
+        const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+        if (status !== 'granted') {
+            Alert.alert('Permissão Necessária', 'É preciso permitir o acesso à galeria para escolher uma foto.');
+            return;
+        }
 
-    let result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: 'images',
-        allowsEditing: true,
-        aspect: [1, 1],
-        quality: 0.8,
-    });
+        let result = await ImagePicker.launchImageLibraryAsync({
+            mediaTypes: 'images',
+            allowsEditing: true,
+            aspect: [1, 1],
+            quality: 0.8,
+        });
 
-    if (!result.canceled) {
-        setFotoUri(result.assets[0].uri);
-    }
-};
+        if (!result.canceled) {
+            setFotoUri(result.assets[0].uri);
+        }
+    };
 
     const handleSave = () => {
         if (!descricao.trim()) {
@@ -148,6 +151,11 @@ export default function ProdutosScreen() {
     const [mostrarFormulario, setMostrarFormulario] = useState(false);
     const [produtoEditando, setProdutoEditando] = useState<Produto | null>(null);
     const [isSaving, setIsSaving] = useState(false);
+    
+    // Novos estados para a busca e o filtro
+    const [termoBusca, setTermoBusca] = useState('');
+    const [filtroEstoque, setFiltroEstoque] = useState<FiltroEstoqueStatus>('todos');
+
     const router = useRouter();
 
     const carregarProdutos = async (showLoader = true) => {
@@ -196,9 +204,30 @@ export default function ProdutosScreen() {
         );
     };
 
+    // Lógica para filtrar os produtos com base na busca e no filtro de Estoque
+    const produtosFiltrados = useMemo(() => {
+        return produtos
+            .filter(produto => {
+                // Filtro de Estoque
+                if (filtroEstoque === 'emEstoque') return (produto.quantidadeEstoque || 0) > 0;
+                if (filtroEstoque === 'semEstoque') return (produto.quantidadeEstoque || 0) === 0;
+                return true; // para 'todos'
+            })
+            .filter(produto => {
+                // Filtro de Busca por texto
+                const termo = termoBusca.toLowerCase();
+                if (!termo) return true;
+                return (
+                    produto.descricao.toLowerCase().includes(termo) ||
+                    (produto.marca || '').toLowerCase().includes(termo) ||
+                    (produto.codigo || '').toLowerCase().includes(termo)
+                );
+            });
+    }, [produtos, termoBusca, filtroEstoque]);
+
     if (isLoading) {
         return (
-            <ImageBackground source={require('../assets/images/fundo.jpg')} style={styles.background} blurRadius={2}>
+            <ImageBackground source={require('../../assets/images/fundo.jpg')} style={styles.background} blurRadius={2}>
                 <View style={styles.overlay} />
                 <View style={styles.loadingContainer}><ActivityIndicator size="large" color="#FFFFFF" /></View>
             </ImageBackground>
@@ -206,17 +235,54 @@ export default function ProdutosScreen() {
     }
 
     return (
-        <ImageBackground source={require('../assets/images/fundo.jpg')} style={styles.background} blurRadius={2}>
+        <ImageBackground source={require('../../assets/images/fundo.jpg')} style={styles.background} blurRadius={2}>
             <View style={styles.overlay} />
             <SafeAreaView style={styles.safeArea}>
                 <View style={styles.headerContainer}>
                     <TouchableOpacity onPress={() => router.back()} style={styles.backButton}><MaterialCommunityIcons name="arrow-left" size={24} color="#FFFFFF" /></TouchableOpacity>
                     <Text style={styles.title}>Catálogo de Produtos</Text>
                 </View>
+                
                 {mostrarFormulario ? (
                     <FormularioProduto produtoEditando={produtoEditando} onSave={handleSalvarProduto} onCancel={handleFecharFormulario} isSaving={isSaving} />
                 ) : (
-                    <ListaProdutosView produtos={produtos} onRefresh={onRefresh} refreshing={refreshing} onEdit={handleAbrirFormularioEditar} onDelete={handleConfirmarExclusao} onAddNew={handleAbrirFormularioNovo} />
+                    <>
+                        <View style={styles.controlesContainer}>
+                            <View style={styles.buscaContainer}>
+                                <MaterialCommunityIcons name="magnify" size={22} color="#A9A9A9" style={styles.buscaIcon} />
+                                <TextInput
+                                    style={styles.buscaInput}
+                                    placeholder="Buscar por nome, marca ou código..."
+                                    value={termoBusca}
+                                    onChangeText={setTermoBusca}
+                                    placeholderTextColor="#A9A9A9"
+                                />
+                            </View>
+                            <View style={styles.filtroContainer}>
+                                <TouchableOpacity 
+                                    style={[styles.filtroBotao, filtroEstoque === 'todos' && styles.filtroBotaoAtivo]}
+                                    onPress={() => setFiltroEstoque('todos')}
+                                ><Text style={styles.filtroTexto}>Todos</Text></TouchableOpacity>
+                                <TouchableOpacity 
+                                    style={[styles.filtroBotao, filtroEstoque === 'emEstoque' && styles.filtroBotaoAtivo]}
+                                    onPress={() => setFiltroEstoque('emEstoque')}
+                                ><Text style={styles.filtroTexto}>Em Estoque</Text></TouchableOpacity>
+                                <TouchableOpacity 
+                                    style={[styles.filtroBotao, filtroEstoque === 'semEstoque' && styles.filtroBotaoAtivo]}
+                                    onPress={() => setFiltroEstoque('semEstoque')}
+                                ><Text style={styles.filtroTexto}>Sem Estoque</Text></TouchableOpacity>
+                            </View>
+                        </View>
+
+                        <ListaProdutosView
+                            produtos={produtosFiltrados}
+                            onRefresh={onRefresh}
+                            refreshing={refreshing}
+                            onEdit={handleAbrirFormularioEditar}
+                            onDelete={handleConfirmarExclusao}
+                            onAddNew={handleAbrirFormularioNovo}
+                        />
+                    </>
                 )}
             </SafeAreaView>
         </ImageBackground>
@@ -231,8 +297,53 @@ const styles = StyleSheet.create({
     headerContainer: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 10, paddingVertical: 10, },
     backButton: { padding: 8 },
     title: { fontSize: 26, fontWeight: 'bold', color: '#FFFFFF', textAlign: 'center', flex: 1, marginRight: 40 },
+    controlesContainer: {
+        paddingHorizontal: 16,
+        paddingTop: 10,
+    },
+    buscaContainer: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: 'rgba(0,0,0,0.25)',
+        borderRadius: 12,
+        paddingHorizontal: 15,
+        borderWidth: 1,
+        borderColor: 'rgba(255,255,255,0.2)',
+    },
+    buscaIcon: {
+        marginRight: 10,
+    },
+    buscaInput: {
+        flex: 1,
+        paddingVertical: 14,
+        fontSize: 16,
+        color: '#FFFFFF',
+    },
+    filtroContainer: {
+        flexDirection: 'row',
+        justifyContent: 'center',
+        gap: 10,
+        marginVertical: 15,
+    },
+    filtroBotao: {
+        paddingVertical: 8,
+        paddingHorizontal: 16,
+        borderRadius: 20,
+        backgroundColor: 'rgba(255, 255, 255, 0.1)',
+        borderWidth: 1,
+        borderColor: 'rgba(255, 255, 255, 0.2)',
+    },
+    filtroBotaoAtivo: {
+        backgroundColor: '#4186a7ff',
+        borderColor: '#81D4FA',
+    },
+    filtroTexto: {
+        color: '#FFFFFF',
+        //fontWeight: 'bold',
+        fontSize: 13,
+    },
     listContentContainer: { paddingHorizontal: 16, paddingBottom: 120 },
-    emptyContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', marginTop: '40%' },
+    emptyContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', marginTop: '20%' },
     emptyText: { fontSize: 18, color: 'rgba(255,255,255,0.7)' },
     card: { backgroundColor: 'rgba(255, 255, 255, 0.1)', borderRadius: 12, padding: 15, marginBottom: 12, flexDirection: 'row', alignItems: 'center' },
     cardImage: { width: 60, height: 60, borderRadius: 8, marginRight: 15, backgroundColor: 'rgba(0,0,0,0.2)' },

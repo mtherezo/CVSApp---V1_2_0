@@ -43,7 +43,7 @@ export default function ConfiguracoesScreen() {
 
     return (
         <ImageBackground
-            source={require("../assets/images/fundo.jpg")} 
+            source={require("../../assets/images/fundo.jpg")} 
             style={styles.background}
             blurRadius={2}
         >
@@ -70,11 +70,7 @@ export default function ConfiguracoesScreen() {
                         }
                         return null;
                     })}
-                    {appVersion && (
-                                            <Text style={styles.versionText}>
-                                                Versão {appVersion}
-                                            </Text>
-                                        )}
+                    
                 </ScrollView>
             </SafeAreaView>
         </ImageBackground>

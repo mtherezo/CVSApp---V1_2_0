@@ -1,11 +1,10 @@
-//Vendascliente.tsx
 import React, { useState, useCallback, useMemo } from 'react';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { View, Text, FlatList, StyleSheet, TouchableOpacity, Alert, ImageBackground, ActivityIndicator, RefreshControl, Platform, SafeAreaView, StatusBar,} from 'react-native';
 import { useRouter, useLocalSearchParams, useFocusEffect } from 'expo-router';
-import { listarVendasPorClienteSQLite, excluirVendaSQLite } from '../src/database/sqlite';
-import { Venda } from '../src/types'; 
-import EnviarLembreteWhatsAppButton from '../src/components/EnviarLembreteWhatsAppButton';
+import { listarVendasPorClienteSQLite, excluirVendaSQLite } from '../../src/database/sqlite';
+import { Venda } from '../../src/types'; 
+import EnviarLembreteWhatsAppButton from '../../src/components/EnviarLembreteWhatsAppButton';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 
 // Define os tipos de filtro possíveis
@@ -21,17 +20,14 @@ export default function VendasClienteScreen() {
     const [isLoading, setIsLoading] = useState(true);
     const [isDeleting, setIsDeleting] = useState<string | null>(null); 
     const [refreshing, setRefreshing] = useState(false);
-    
-    // Adiciona o estado para controlar o filtro ativo
     const [filtroAtivo, setFiltroAtivo] = useState<FiltroStatus>('todas');
-
     const router = useRouter();
     const insets = useSafeAreaInsets();
 
     const carregarVendasDoCliente = async (showMainLoader = true) => {
         if (!idCliente) {
             Alert.alert("Erro", "ID do Cliente não fornecido.");
-            if (router.canGoBack()) router.back(); else router.replace('/Home');
+            if (router.canGoBack()) router.back(); else router.replace('/(gcliente)/Clientes');
             return;
         }
         if (showMainLoader) setIsLoading(true);
@@ -101,7 +97,7 @@ export default function VendasClienteScreen() {
             const valorPago = calcularValorPago(venda);
             const saldoDevedor = venda.valorTotal - valorPago;
 
-            if (filtroAtivo === 'pendentes') return valorPago === 0;
+            if (filtroAtivo === 'pendentes') return valorPago === 0 && venda.valorTotal > 0;
             if (filtroAtivo === 'parciais') return valorPago > 0 && saldoDevedor > 0.001;
             if (filtroAtivo === 'quitadas') return saldoDevedor <= 0.001;
             
@@ -134,7 +130,15 @@ export default function VendasClienteScreen() {
         return (
             <View style={styles.cardVenda}>
                 <View style={styles.cardHeader}>
-                    <Text style={styles.dataVenda}>{new Intl.DateTimeFormat('pt-BR', { day: '2-digit', month: 'short', year: 'numeric' }).format(new Date(item.dataVenda))}</Text>
+                    {/* Bloco de Data e Status de Parcela */}
+                    <View>
+                        <Text style={styles.dataVenda}>{new Intl.DateTimeFormat('pt-BR', { day: '2-digit', month: 'short', year: 'numeric' }).format(new Date(item.dataVenda))}</Text>
+                        {item.tipoPagamento === 'Parcelado' && (
+                            <Text style={styles.parcelaStatus}>
+                                {`Parcelas: ${item.parcelasPagas || 0} de ${item.parcelasTotais}`}
+                            </Text>
+                        )}
+                    </View>
                     <Text style={isQuitada ? styles.statusQuitada : styles.statusPendente}>
                         {isQuitada ? "Quitada" : "Pendente"}
                     </Text>
@@ -159,13 +163,9 @@ export default function VendasClienteScreen() {
                             <Text style={[styles.valorMontante, styles.textoDesconto]}>- R$ {item.desconto.toFixed(2)}</Text>
                         </>
                     ) : null}
-
-                    
                     <Text style={[styles.valorLabel, styles.labelTotalFinal]}>Total:</Text>
                     <Text style={[styles.valorMontante, styles.textoTotalFinal]}>R$ {item.valorTotal.toFixed(2)}</Text>
-                    
                     <View style={styles.divisorFinanceiro} />
-
                     <Text style={styles.valorLabel}>Pago:</Text>
                     <Text style={styles.valorMontante}>R$ {valorPago.toFixed(2)}</Text>
                     <Text style={styles.valorLabel}>Pendente:</Text>
@@ -193,18 +193,18 @@ export default function VendasClienteScreen() {
                         />
                     )}
                     
+                    <TouchableOpacity style={[styles.botaoCard, styles.botaoEditar]} onPress={() => router.push({ pathname: '/(gvenda)/Cadastrovenda', params: { idVenda: item.id, idCliente: idCliente, nome: nomeCliente, telefone: telefoneCliente, } })}>
+                        <MaterialCommunityIcons name="pencil-outline" size={24} color="#FFFFFF" />
+                    </TouchableOpacity>
+                    
                     <TouchableOpacity style={[styles.botaoCard, styles.botaoDetalhes]} onPress={() => router.push({ pathname: './Parcelasvendacliente', params: { idVenda: item.id } })}>
-                        <MaterialCommunityIcons name="cash-multiple" size={30} color="#FFFFFF" />
+                        <MaterialCommunityIcons name="cash-multiple" size={24} color="#FFFFFF" />
                     </TouchableOpacity>
-
-                    <TouchableOpacity style={[styles.botaoCard, styles.botaoEditar]} onPress={() => router.push({ pathname: '/Cadastrovenda', params: { idVenda: item.id, idCliente: idCliente, nome: nomeCliente, telefone: telefoneCliente, } })}>
-                        <MaterialCommunityIcons name="pencil-outline" size={30} color="#FFFFFF" />
-                    </TouchableOpacity>
-                                            
+                                        
                     <TouchableOpacity style={[styles.botaoCard, styles.botaoExcluir, isDeleting === item.id && styles.disabledButton]} onPress={() => confirmarExclusaoVenda(item)} disabled={isDeleting === item.id}>
                         {isDeleting === item.id ? 
                             <ActivityIndicator size="small" color="#FFFFFF" /> : 
-                            <MaterialCommunityIcons name="delete-outline" size={30} color="#FFFFFF" />
+                            <MaterialCommunityIcons name="delete-outline" size={24} color="#FFFFFF" />
                         }
                     </TouchableOpacity>
                 </View>
@@ -222,19 +222,19 @@ export default function VendasClienteScreen() {
             </View>
             <View style={styles.filtroContainer}>
                 <TouchableOpacity 
-                    style={[styles.filtroBotao, filtroAtivo === 'todas' && styles.filtroBotaoAtivo]}
+                    style={[styles.filtroBotao, filtroAtivo === 'todas' && styles.filtroTodasAtivo]}
                     onPress={() => setFiltroAtivo('todas')}
                 ><Text style={styles.filtroTexto}>Todas</Text></TouchableOpacity>
                 <TouchableOpacity 
-                    style={[styles.filtroBotao, filtroAtivo === 'pendentes' && styles.filtroBotaoAtivo]}
+                    style={[styles.filtroBotao, filtroAtivo === 'pendentes' && styles.filtroPendenteAtivo]}
                     onPress={() => setFiltroAtivo('pendentes')}
                 ><Text style={styles.filtroTexto}>Pendentes</Text></TouchableOpacity>
                 <TouchableOpacity 
-                    style={[styles.filtroBotao, filtroAtivo === 'parciais' && styles.filtroBotaoAtivo]}
+                    style={[styles.filtroBotao, filtroAtivo === 'parciais' && styles.filtroParcialAtivo]}
                     onPress={() => setFiltroAtivo('parciais')}
                 ><Text style={styles.filtroTexto}>Parciais</Text></TouchableOpacity>
                 <TouchableOpacity 
-                    style={[styles.filtroBotao, filtroAtivo === 'quitadas' && styles.filtroBotaoAtivo]}
+                    style={[styles.filtroBotao, filtroAtivo === 'quitadas' && styles.filtroQuitadoAtivo]}
                     onPress={() => setFiltroAtivo('quitadas')}
                 ><Text style={styles.filtroTexto}>Quitadas</Text></TouchableOpacity>
             </View>
@@ -243,7 +243,7 @@ export default function VendasClienteScreen() {
 
     if (isLoading && !refreshing) {
         return (
-            <ImageBackground source={require("../assets/images/fundo.jpg")} style={styles.background} blurRadius={2}>
+            <ImageBackground source={require("../../assets/images/fundo.jpg")} style={styles.background} blurRadius={2}>
                 <View style={styles.overlay} />
                 <View style={styles.loadingContainer}>
                     <ActivityIndicator size="large" color="#FFFFFF" />
@@ -254,7 +254,7 @@ export default function VendasClienteScreen() {
     }
 
     return (
-        <ImageBackground source={require("../assets/images/fundo.jpg")} style={styles.background} blurRadius={2}>
+        <ImageBackground source={require("../../assets/images/fundo.jpg")} style={styles.background} blurRadius={2}>
             <View style={styles.overlay} />
             <SafeAreaView style={styles.safeArea}>
                 <FlatList
@@ -280,7 +280,7 @@ export default function VendasClienteScreen() {
                 <View style={[styles.footerAcoes, { paddingBottom: insets.bottom > 0 ? insets.bottom + 10 : 20 }]}>
                     <TouchableOpacity
                         style={styles.botaoPrincipal}
-                        onPress={() => router.push({ pathname: '/Cadastrovenda', params: { idCliente, nome: nomeCliente, telefone: telefoneCliente } })}
+                        onPress={() => router.push({ pathname: '/(gvenda)/Cadastrovenda', params: { idCliente, nome: nomeCliente, telefone: telefoneCliente } })}
                     >
                         <MaterialCommunityIcons name="cart-plus" size={24} color="#FFFFFF" />
                         <Text style={styles.textoBotaoPrincipal}>Nova Venda</Text>
@@ -301,33 +301,23 @@ const styles = StyleSheet.create({
     backButton: { padding: 8, marginRight: 10 },
     title: { fontSize: 24, fontWeight: 'bold', color: '#FFFFFF', flex: 1 },
     listContentContainer: { paddingHorizontal: 16, paddingBottom: 100 },
-    filtroContainer: {
-        flexDirection: 'row',
-        justifyContent: 'space-around',
-        paddingHorizontal: 16,
-        paddingBottom: 20,
-        paddingTop: 5,
-    },
-    filtroBotao: {
-        paddingVertical: 8,
-        paddingHorizontal: 16,
-        borderRadius: 20,
-        backgroundColor: 'rgba(255, 255, 255, 0.1)',
-        borderWidth: 1,
-        borderColor: 'rgba(255, 255, 255, 0.2)',
-    },
-    filtroBotaoAtivo: {
-        backgroundColor: '#81D4FA',
-        borderColor: '#81D4FA',
-    },
-    filtroTexto: {
-        color: '#FFFFFF',
-        fontWeight: 'bold',
-        fontSize: 13,
-    },
+    filtroContainer: { flexDirection: 'row', justifyContent: 'space-around', paddingHorizontal: 16, paddingBottom: 20, paddingTop: 5, },
+    filtroBotao: { paddingVertical: 8, paddingHorizontal: 16, borderRadius: 20, backgroundColor: 'rgba(255, 255, 255, 0.1)', borderWidth: 1, borderColor: 'rgba(255, 255, 255, 0.2)', },
+    filtroTexto: { color: '#FFFFFF', fontWeight: 'bold', fontSize: 13, },
+    filtroTodasAtivo: { backgroundColor: '#81D4FA', borderColor: '#81D4FA', },
+    filtroPendenteAtivo: { backgroundColor: '#FFCC80', borderColor: '#FFCC80', },
+    filtroParcialAtivo: { backgroundColor: '#B39DDB', borderColor: '#B39DDB', },
+    filtroQuitadoAtivo: { backgroundColor: '#A5D6A7', borderColor: '#A5D6A7', },
     cardVenda: { backgroundColor: 'rgba(255, 255, 255, 0.1)', borderRadius: 12, padding: 15, marginBottom: 15, borderWidth: 1, borderColor: 'rgba(255, 255, 255, 0.2)', },
-    cardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 },
+    cardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 10 },
     dataVenda: { fontSize: 14, color: '#E0E0FF', fontStyle: 'italic' },
+    
+    parcelaStatus: {
+        fontSize: 13,
+        color: '#B39DDB', // Roxo, combinando com o filtro 'Parciais'
+        fontWeight: 'bold',
+        marginTop: 4,
+    },
     statusQuitada: { fontSize: 12, fontWeight: 'bold', color: '#A5D6A7', backgroundColor: 'rgba(76, 175, 80, 0.25)', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 10, overflow: 'hidden' },
     statusPendente: { fontSize: 12, fontWeight: 'bold', color: '#FFCC80', backgroundColor: 'rgba(255, 152, 0, 0.25)', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 10, overflow: 'hidden' },
     itensContainer: { marginBottom: 12, paddingLeft: 4, borderLeftWidth: 3, borderLeftColor: 'rgba(255,255,255,0.15)', },

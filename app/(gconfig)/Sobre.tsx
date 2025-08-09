@@ -11,7 +11,7 @@ export default function SobreScreen() {
 
     return (
         <ImageBackground
-            source={require("../assets/images/fundo.jpg")} 
+            source={require("../../assets/images/fundo.jpg")} 
             style={styles.background}
             blurRadius={2}
         >

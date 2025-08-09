@@ -5,17 +5,17 @@ import {
     ActivityIndicator, RefreshControl, Platform, SafeAreaView, StatusBar,
     TextInput, ScrollView
 } from 'react-native';
-import { Usuario } from '../src/types';
+import { Usuario } from '../../src/types';
 import { useRouter, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { 
     obterTodosUsuariosSQLite as obterTodosUsuarios,
     adicionarOuAtualizarUsuarioSQLite as adicionarOuAtualizarUsuario,
     excluirUsuarioSQLite as excluirUsuario,
     buscarUsuarioPorUsernameSQLite
-} from '../src/database/sqlite';
+} from '../../src/database/sqlite';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import CryptoJS from "crypto-js";
-import PasswordPromptModal from '../src/components/PasswordPromptModal';
+import PasswordPromptModal from '../../src/components/PasswordPromptModal';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 // DEFINE A INTERFACE PARA AS PROPRIEDADES DO FORMULÁRIO
@@ -236,7 +236,7 @@ export default function GerenciarUsuariosScreen() {
 
     if (isLoading) {
         return (
-            <ImageBackground source={require('../assets/images/fundo.jpg')} style={styles.background} blurRadius={2}>
+            <ImageBackground source={require('../../assets/images/fundo.jpg')} style={styles.background} blurRadius={2}>
                 <View style={styles.overlay} />
                 <View style={styles.loadingContainer}><ActivityIndicator size="large" color="#FFFFFF" /></View>
             </ImageBackground>
@@ -244,7 +244,7 @@ export default function GerenciarUsuariosScreen() {
     }
 
     return (
-        <ImageBackground source={require('../assets/images/fundo.jpg')} style={styles.background} blurRadius={2}>
+        <ImageBackground source={require('../../assets/images/fundo.jpg')} style={styles.background} blurRadius={2}>
             <View style={styles.overlay} />
             <SafeAreaView style={styles.safeArea}>
                 <View style={styles.headerContainer}>

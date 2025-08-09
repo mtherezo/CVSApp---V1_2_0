@@ -2,8 +2,8 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, TextInput, FlatList, TouchableOpacity, StyleSheet, ImageBackground, ActivityIndicator, Platform, SafeAreaView, Alert, StatusBar,} from 'react-native';
 import { useRouter } from 'expo-router';
-import { Cliente } from '../src/types';
-import { pesquisarClientesPorNomeSQLite } from '../src/database/sqlite';
+import { Cliente } from '../../src/types';
+import { pesquisarClientesPorNomeSQLite } from '../../src/database/sqlite';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 
 export default function PesquisarVendasClienteScreen() {
@@ -93,7 +93,7 @@ export default function PesquisarVendasClienteScreen() {
 
   return (
     <ImageBackground
-      source={require("../assets/images/fundo.jpg")}
+      source={require("../../assets/images/fundo.jpg")}
       style={styles.background}
       blurRadius={2}
     >

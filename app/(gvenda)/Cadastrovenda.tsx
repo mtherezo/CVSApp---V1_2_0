@@ -10,8 +10,8 @@ import {
     listarVendaPorIdSQLite as listarVendaPorId,
     listarProdutosSQLite as listarProdutos,
     atualizarEstoqueProdutoSQLite
-} from '../src/database/sqlite';
-import { Venda, ItemVenda, Produto } from '../src/types';
+} from '../../src/database/sqlite';
+import { Venda, ItemVenda, Produto } from '../../src/types';
 import * as Crypto from 'expo-crypto';
 import DateTimePicker, { DateTimePickerEvent } from '@react-native-community/datetimepicker';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
@@ -175,9 +175,9 @@ export default function CadastroVendaScreen() {
         
         setIsSaving(true);
         try {
-            // --- 1. VERIFICAÇÃO DE STOCK ---
+            // --- 1. VERIFICAÇÃO DE ESTOQUE ---
             for (const itemVenda of itens) {
-                if (itemVenda.idProduto) { // Só verifica stock de produtos do catálogo
+                if (itemVenda.idProduto) { // Só verifica estoque de produtos do catálogo
                     const produtoCatalogo = catalogoProdutos.find(p => p.id === itemVenda.idProduto);
                     const estoqueDisponivel = produtoCatalogo?.quantidadeEstoque || 0;
                     const quantidadeOriginal = vendaOriginal?.itens.find(i => i.idProduto === itemVenda.idProduto)?.quantidade || 0;
@@ -188,7 +188,7 @@ export default function CadastroVendaScreen() {
                 }
             }
 
-            // --- 2. CALCULA MUDANÇAS NO STOCK ---
+            // --- 2. CALCULA MUDANÇAS NO ESTOQUE ---
             const mudancasEstoque = new Map<string, number>();
             if (isEditing && vendaOriginal) {
                 vendaOriginal.itens.forEach(item => {
@@ -247,7 +247,7 @@ export default function CadastroVendaScreen() {
 
     if (isLoadingData) {
         return (
-            <ImageBackground source={require("../assets/images/fundo.jpg")} style={styles.background} blurRadius={2}>
+            <ImageBackground source={require("../../assets/images/fundo.jpg")} style={styles.background} blurRadius={2}>
                 <View style={styles.overlay} />
                 <View style={styles.loadingContainer}>
                     <ActivityIndicator size="large" color="#FFFFFF" />
@@ -258,7 +258,7 @@ export default function CadastroVendaScreen() {
     }
 
     return (
-        <ImageBackground source={require("../assets/images/fundo.jpg")} style={styles.background} blurRadius={2}>
+        <ImageBackground source={require("../../assets/images/fundo.jpg")} style={styles.background} blurRadius={2}>
             <View style={styles.overlay} />
             <SafeAreaView style={styles.safeArea}>
                 <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : "height"} style={styles.keyboardAvoidingContainer}>

@@ -13,8 +13,8 @@ const navButtons = [
     { title: 'Catálogo de Produtos', icon: 'package-variant-closed', pathname: '/Produtos', color: '#81D4FA' },
     { title: 'Pesquisar Vendas', icon: 'magnify', pathname: '/Pesquisarvendascliente', color: '#A5D6A7' },
     { title: 'Histórico de Vendas', icon: 'history', pathname: '/Todasvendas', color: '#A5D6A7' },
-    { title: 'Relatórios de Vendas', icon: 'file-chart-outline', pathname: '/Gerarrelatorios', color: '#FFCC80' },
-    { title: 'Configurações', icon: 'cog-outline', pathname: '/Configuracoes', color: '#FFCC80' },
+    { title: 'Relatórios de Vendas', icon: 'file-chart-outline', pathname: '/Gerarrelatorios', color: '#A5D6A7' },
+    { title: 'Configurações', icon: 'cog-outline', pathname: '/Configuracoes', color: '#BDBDBD' },
 ] as const; // O "as const" garante a tipagem correta para as rotas
 
 const ADMIN_USERNAME = "stherezo";

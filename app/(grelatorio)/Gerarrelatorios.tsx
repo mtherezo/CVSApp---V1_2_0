@@ -6,8 +6,8 @@ import * as Print from 'expo-print';
 import * as Sharing from 'expo-sharing';
 import * as FileSystem from 'expo-file-system';
 import * as XLSX from 'xlsx';
-import { Venda } from '../src/types';
-import { listarVendasPorPeriodoSQLite } from '../src/database/sqlite';
+import { Venda } from '../../src/types';
+import { listarVendasPorPeriodoSQLite } from '../../src/database/sqlite';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import DateTimePicker, { DateTimePickerEvent } from '@react-native-community/datetimepicker';
 
@@ -222,7 +222,7 @@ export default function GerarRelatoriosScreen() {
     };
 
     return (
-        <ImageBackground source={require('../assets/images/fundo.jpg')} style={styles.background} blurRadius={2}>
+        <ImageBackground source={require('../../assets/images/fundo.jpg')} style={styles.background} blurRadius={2}>
             <View style={styles.overlay} />
             <SafeAreaView style={styles.safeArea}>
                 <ScrollView contentContainerStyle={styles.scrollContainer}>
