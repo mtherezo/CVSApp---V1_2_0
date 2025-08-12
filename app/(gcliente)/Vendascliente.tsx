@@ -1,3 +1,4 @@
+//Vendasclientes.tsx
 import React, { useState, useCallback, useMemo } from 'react';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { View, Text, FlatList, StyleSheet, TouchableOpacity, Alert, ImageBackground, ActivityIndicator, RefreshControl, Platform, SafeAreaView, StatusBar,} from 'react-native';
@@ -109,7 +110,19 @@ export default function VendasClienteScreen() {
         const valorPago = calcularValorPago(item);
         const saldoDevedorItem = item.valorTotal - valorPago;
         const progresso = item.valorTotal > 0 ? (valorPago / item.valorTotal) * 100 : (valorPago > 0 ? 100 : 0);
-        const isQuitada = saldoDevedorItem <= 0.001;
+        
+        //  LÓGICA PARA DETERMINAR O STATUS E O ESTILO
+        const getStatusInfo = () => {
+            if (saldoDevedorItem <= 0.001) {
+                return { text: 'Pagamento Quitado', style: styles.statusQuitada };
+            }
+            if (valorPago > 0) {
+                return { text: 'Pagamento Parcial', style: styles.statusParcial };
+            }
+            return { text: 'Pagamento Pendente', style: styles.statusPendente };
+        };
+
+        const statusInfo = getStatusInfo();
         
         let valorParaLembrete = 0;
         let dataVencimentoParaLembrete: string | Date = item.dataVenda;
@@ -130,7 +143,6 @@ export default function VendasClienteScreen() {
         return (
             <View style={styles.cardVenda}>
                 <View style={styles.cardHeader}>
-                    {/* Bloco de Data e Status de Parcela */}
                     <View>
                         <Text style={styles.dataVenda}>{new Intl.DateTimeFormat('pt-BR', { day: '2-digit', month: 'short', year: 'numeric' }).format(new Date(item.dataVenda))}</Text>
                         {item.tipoPagamento === 'Parcelado' && (
@@ -139,8 +151,9 @@ export default function VendasClienteScreen() {
                             </Text>
                         )}
                     </View>
-                    <Text style={isQuitada ? styles.statusQuitada : styles.statusPendente}>
-                        {isQuitada ? "Quitada" : "Pendente"}
+                    {/* USA O STATUS E ESTILO DINÂMICOS */}
+                    <Text style={statusInfo.style}>
+                        {statusInfo.text}
                     </Text>
                 </View>
 
@@ -311,14 +324,9 @@ const styles = StyleSheet.create({
     cardVenda: { backgroundColor: 'rgba(255, 255, 255, 0.1)', borderRadius: 12, padding: 15, marginBottom: 15, borderWidth: 1, borderColor: 'rgba(255, 255, 255, 0.2)', },
     cardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 10 },
     dataVenda: { fontSize: 14, color: '#E0E0FF', fontStyle: 'italic' },
-    
-    parcelaStatus: {
-        fontSize: 13,
-        color: '#B39DDB', // Roxo, combinando com o filtro 'Parciais'
-        fontWeight: 'bold',
-        marginTop: 4,
-    },
+    parcelaStatus: { fontSize: 13, color: '#B39DDB', fontWeight: 'bold', marginTop: 4, },
     statusQuitada: { fontSize: 12, fontWeight: 'bold', color: '#A5D6A7', backgroundColor: 'rgba(76, 175, 80, 0.25)', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 10, overflow: 'hidden' },
+    statusParcial: { fontSize: 12, fontWeight: 'bold', color: '#D1C4E9', backgroundColor: 'rgba(126, 87, 194, 0.3)', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 10, overflow: 'hidden' },
     statusPendente: { fontSize: 12, fontWeight: 'bold', color: '#FFCC80', backgroundColor: 'rgba(255, 152, 0, 0.25)', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 10, overflow: 'hidden' },
     itensContainer: { marginBottom: 12, paddingLeft: 4, borderLeftWidth: 3, borderLeftColor: 'rgba(255,255,255,0.15)', },
     itemLinha: { flexDirection: 'row', alignItems: 'center', marginBottom: 5, paddingLeft: 10, },

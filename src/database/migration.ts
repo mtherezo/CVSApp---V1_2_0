@@ -1,42 +1,52 @@
 // src/database/migration.ts
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as SecureStore from 'expo-secure-store';
-import { db, cadastrarClienteSQLite, cadastrarProdutoSQLite, inserirVendaCompleta as inserirVendaCompletaSQLite, adicionarOuAtualizarUsuarioSQLite } from './sqlite';
+import { 
+    db, 
+    cadastrarClienteSQLite, 
+    cadastrarProdutoSQLite, 
+    inserirVendaCompleta as inserirVendaCompletaSQLite, 
+    adicionarOuAtualizarUsuarioSQLite 
+} from './sqlite';
 import { Cliente, Venda, Usuario, Produto } from '../types';
 import { Alert } from 'react-native';
 
-// ✨ 1. CHAVES ANTIGAS EXATAS QUE VOCÊ ENCONTROU
+// CHAVES ANTIGAS EXATAS QUE VOCÊ ENCONTROU
 const CHAVE_CLIENTES_ANTIGA = 'clientes_data';
 const CHAVE_PRODUTOS_ANTIGA = '@produtos';
 const CHAVE_VENDAS_ANTIGA = 'vendas';
 const CHAVE_USUARIOS_ANTIGA = 'user_data'; // A chave do SecureStore
 
-const MIGRATION_FLAG_KEY = 'dados_migrados_para_sqlite_v1';
+const MIGRATION_FLAG_KEY = 'dados_migrados_para_sqlite_v2'; // Mudei a versão da bandeira para forçar a execução
 
 // --- Funções para ler os dados do sistema antigo ---
 
 const lerClientesAntigos = async (): Promise<Cliente[]> => {
-    console.log(`MIGRAÇÃO LOG: Lendo clientes da chave AsyncStorage: "${CHAVE_CLIENTES_ANTIGA}"`);
+    console.log(`MIGRAÇÃO LOG: A ler clientes da chave AsyncStorage: "${CHAVE_CLIENTES_ANTIGA}"`);
     const dados = await AsyncStorage.getItem(CHAVE_CLIENTES_ANTIGA);
+    console.log(`MIGRAÇÃO LOG: Dados brutos de clientes encontrados: ${dados ? 'SIM' : 'NÃO'}`);
     return dados ? JSON.parse(dados) : [];
 };
 
 const lerProdutosAntigos = async (): Promise<Produto[]> => {
-    console.log(`MIGRAÇÃO LOG: Lendo produtos da chave AsyncStorage: "${CHAVE_PRODUTOS_ANTIGA}"`);
+    console.log(`MIGRAÇÃO LOG: A ler produtos da chave AsyncStorage: "${CHAVE_PRODUTOS_ANTIGA}"`);
     const dados = await AsyncStorage.getItem(CHAVE_PRODUTOS_ANTIGA);
+    console.log(`MIGRAÇÃO LOG: Dados brutos de produtos encontrados: ${dados ? 'SIM' : 'NÃO'}`);
     return dados ? JSON.parse(dados) : [];
 };
 
 const lerVendasAntigas = async (): Promise<Venda[]> => {
-    console.log(`MIGRAÇÃO LOG: Lendo vendas da chave AsyncStorage: "${CHAVE_VENDAS_ANTIGA}"`);
+    console.log(`MIGRAÇÃO LOG: A ler vendas da chave AsyncStorage: "${CHAVE_VENDAS_ANTIGA}"`);
     const dados = await AsyncStorage.getItem(CHAVE_VENDAS_ANTIGA);
+    console.log(`MIGRAÇÃO LOG: Dados brutos de vendas encontrados: ${dados ? 'SIM' : 'NÃO'}`);
     return dados ? JSON.parse(dados) : [];
 };
 
 const lerUsuariosAntigos = async (): Promise<Usuario[]> => {
-    console.log(`MIGRAÇÃO LOG: Lendo usuários da chave SecureStore: "${CHAVE_USUARIOS_ANTIGA}"`);
-    //Lê do SecureStore, que era onde os usuários ficavam
+    console.log(`MIGRAÇÃO LOG: A ler usuários da chave SecureStore: "${CHAVE_USUARIOS_ANTIGA}"`);
+    // Lê do SecureStore, que era onde os usuários ficavam
     const dados = await SecureStore.getItemAsync(CHAVE_USUARIOS_ANTIGA);
+    console.log(`MIGRAÇÃO LOG: Dados brutos de usuários encontrados: ${dados ? 'SIM' : 'NÃO'}`);
     return dados ? JSON.parse(dados) : [];
 };
 
@@ -49,7 +59,7 @@ export const executarMigracaoDeDados = async () => {
       return;
     }
     
-    console.log("MIGRAÇÃO DE DADOS: Iniciando processo...");
+    console.log("MIGRAÇÃO DE DADOS: Iniciando o  processo...");
     
     // LÊ TODOS OS DADOS DE TODOS OS LOCAIS ANTIGOS
     const clientesAntigos = await lerClientesAntigos();
@@ -64,7 +74,7 @@ export const executarMigracaoDeDados = async () => {
     }
     
     Alert.alert(
-        "Atualizando Seus Dados", 
+        "Atualizando os Seus Dados", 
         "Estamos organizando tudo para a nova versão do aplicativo. Por favor, aguarde um momento."
     );
 
@@ -89,10 +99,10 @@ export const executarMigracaoDeDados = async () => {
 
     await AsyncStorage.setItem(MIGRATION_FLAG_KEY, 'true');
     console.log("MIGRAÇÃO DE DADOS: Migração concluída com sucesso!");
-    Alert.alert("Atualização Concluída!", "Seus dados foram organizados com sucesso.");
+    Alert.alert("Atualização Concluída!", "Os seus dados foram organizados com sucesso.");
 
   } catch (error) {
     console.error("MIGRAÇÃO DE DADOS: ERRO CRÍTICO DURANTE A MIGRAÇÃO:", error);
-    Alert.alert("Erro na Atualização", "Ocorreu um erro ao atualizar seus dados. Por favor, contate o suporte.");
+    Alert.alert("Erro na Atualização", "Ocorreu um erro ao atualizar os seus dados. Por favor, contate o suporte.");
   }
 };

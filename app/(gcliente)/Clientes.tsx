@@ -1,190 +1,195 @@
 //Clientes.tsx
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import { View, Text, FlatList, StyleSheet, TouchableOpacity, Alert, ImageBackground, ActivityIndicator, RefreshControl, Platform, SafeAreaView, StatusBar,} from 'react-native';
 import { Cliente } from '../../src/types';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { listarClientesSQLite, excluirClienteSQLite } from '../../src/database/sqlite';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useAppContext } from '../../src/contexts/AppContext'; // ✨ 1. Importa o hook do contexto
 
 export default function ClientesScreen() {
-  const [clientes, setClientes] = useState<Cliente[]>([]);
-  const [clienteSelecionado, setClienteSelecionado] = useState<Cliente | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const [isDeleting, setIsDeleting] = useState(false);
-  const [refreshing, setRefreshing] = useState(false);
-  const router = useRouter();
-  const insets = useSafeAreaInsets(); // Hook para obter as margens seguras
+    const [clientes, setClientes] = useState<Cliente[]>([]);
+    const [clienteSelecionado, setClienteSelecionado] = useState<Cliente | null>(null);
+    const [isLoading, setIsLoading] = useState(true);
+    const [isDeleting, setIsDeleting] = useState(false);
+    const [refreshing, setRefreshing] = useState(false);
+    const router = useRouter();
+    const insets = useSafeAreaInsets();
+    const { isDbReady } = useAppContext(); // ✨ 2. Obtém o status de prontidão do banco de dados
 
-  const carregarClientesComLoading = async (showLoader = true) => {
-    if (showLoader) setIsLoading(true);
-    try {
-      const dados = await listarClientesSQLite();
-      setClientes(dados);
-    } catch (error) {
-      console.error('Falha ao carregar clientes (catch na tela):', error);
-      Alert.alert('Erro', 'Não foi possível carregar a lista de clientes.');
-    } finally {
-      if (showLoader) setIsLoading(false);
-    }
-  };
-
-  const onRefresh = useCallback(async () => {
-    setRefreshing(true);
-    await carregarClientesComLoading(false);
-    setRefreshing(false);
-  }, []);
-
-  useFocusEffect(
-    useCallback(() => {
-      carregarClientesComLoading();
-      setClienteSelecionado(null);
-    }, [])
-  );
-
-  const handleExcluirCliente = async () => {
-    if (!clienteSelecionado) {
-      Alert.alert("Atenção", "Nenhum cliente selecionado para excluir.");
-      return;
-    }
-
-    Alert.alert(
-      'Confirmar Exclusão',
-      `Tem certeza que deseja excluir o cliente "${clienteSelecionado.nome}"? Todas as vendas associadas também serão excluídas. Esta ação não pode ser desfeita.`,
-      [
-        { text: 'Cancelar', style: 'cancel', onPress: () => setClienteSelecionado(null) },
-        {
-          text: 'Excluir Definitivamente',
-          style: 'destructive',
-          onPress: async () => {
-            setIsDeleting(true);
-            try {
-              await excluirClienteSQLite(clienteSelecionado.id);
-              Alert.alert('Sucesso', `Cliente "${clienteSelecionado.nome}" e suas vendas foram excluídos.`);
-              setClienteSelecionado(null);
-              await carregarClientesComLoading(false);
-            } catch (error) {
-              console.error('Falha ao excluir cliente:', error);
-              Alert.alert('Erro Inesperado', 'Ocorreu um erro ao tentar excluir o cliente.');
-            } finally {
-              setIsDeleting(false);
-            }
-          }
+    const carregarClientesComLoading = async (showLoader = true) => {
+        if (showLoader) setIsLoading(true);
+        try {
+            const dados = await listarClientesSQLite();
+            setClientes(dados);
+        } catch (error) {
+            console.error('Falha ao carregar clientes (catch na tela):', error);
+            Alert.alert('Erro', 'Não foi possível carregar a lista de clientes.');
+        } finally {
+            if (showLoader) setIsLoading(false);
         }
-      ]
+    };
+
+    const onRefresh = useCallback(async () => {
+        setRefreshing(true);
+        await carregarClientesComLoading(false);
+        setRefreshing(false);
+    }, []);
+
+    useFocusEffect(
+        useCallback(() => {
+            // ✨ 3. CONDIÇÃO DE SEGURANÇA ADICIONADA
+            // Só tenta carregar os clientes DEPOIS que o banco de dados estiver 100% pronto.
+            if (isDbReady) {
+                carregarClientesComLoading();
+                setClienteSelecionado(null);
+            }
+        }, [isDbReady]) // Roda sempre que o status do DB mudar (e quando a tela focar)
     );
-  };
 
-  const renderItemCliente = ({ item }: { item: Cliente }) => (
-    <TouchableOpacity
-      style={[
-        styles.cardCliente,
-        clienteSelecionado?.id === item.id && styles.itemSelecionado,
-      ]}
-      onPress={() => clienteSelecionado?.id === item.id ? setClienteSelecionado(null) : setClienteSelecionado(item)}
-      disabled={isDeleting}
-    >
-      <View style={styles.iconContainer}>
-          <MaterialCommunityIcons name="account-circle-outline" size={32} color="#E0E0FF" />
-      </View>
-      <View style={styles.infoContainer}>
-          <Text style={styles.nomeCliente}>{item.nome}</Text>
-          {item.telefone ? <Text style={styles.detalheCliente}>{item.telefone}</Text> : null}
-          {item.email ? <Text style={styles.detalheCliente}>{item.email}</Text> : null}
-      </View>
-      <MaterialCommunityIcons
-          name={clienteSelecionado?.id === item.id ? "checkbox-marked-circle" : "checkbox-blank-circle-outline"}
-          size={24}
-          color={clienteSelecionado?.id === item.id ? "#4CAF50" : "#A9A9A9"}
-      />
-    </TouchableOpacity>
-  );
+    const handleExcluirCliente = async () => {
+        if (!clienteSelecionado) {
+            Alert.alert("Atenção", "Nenhum cliente selecionado para excluir.");
+            return;
+        }
 
-  if (isLoading && !refreshing) {
-    return (
-      <ImageBackground source={require("../../assets/images/fundo.jpg")} style={styles.background} blurRadius={2}>
-        <View style={styles.overlay} />
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#FFFFFF" />
-          <Text style={styles.loadingText}>A carregar clientes...</Text>
-        </View>
-      </ImageBackground>
-    );
-  }
-
-  return (
-    <ImageBackground source={require("../../assets/images/fundo.jpg")} style={styles.background} blurRadius={2}>
-      <View style={styles.overlay} />
-      <SafeAreaView style={styles.safeArea}>
-        <View style={styles.headerContainer}>
-            <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-                <MaterialCommunityIcons name="arrow-left" size={24} color="#FFFFFF" />
-            </TouchableOpacity>
-            <Text style={styles.title}>Gerenciar Clientes</Text>
-        </View>
-
-        <FlatList
-          data={clientes}
-          keyExtractor={(item) => item.id}
-          renderItem={renderItemCliente}
-          ListEmptyComponent={
-            <View style={styles.emptyListContainer}>
-                <MaterialCommunityIcons name="account-search-outline" size={60} color="rgba(255,255,255,0.3)" />
-                <Text style={styles.listaVaziaTexto}>Nenhum cliente cadastrado.</Text>
-                <Text style={styles.listaVaziaSubtexto}>Clique em "Novo Cliente" para começar.</Text>
-            </View>
-          }
-          contentContainerStyle={styles.listContentContainer}
-          refreshControl={
-            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#FFFFFF" />
-          }
-        />
-
-        {/* --- BARRA DE AÇÕES NO RODAPÉ --- */}
-        {/* ✨ CORREÇÃO: Aplicando o padding inferior dinâmico */}
-        <View style={[styles.footerAcoes, { paddingBottom: insets.bottom > 0 ? insets.bottom : 12 }]}>
-            <TouchableOpacity
-                style={[styles.botaoAcao, (isDeleting) && styles.disabledButton]}
-                onPress={() => router.push('./Cadastrocliente')}
-                disabled={isDeleting}
-            >
-                <MaterialCommunityIcons name="account-plus-outline" size={22} color="#FFFFFF" />
-                <Text style={styles.textoBotaoAcao}>Novo Cliente</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-                style={[styles.botaoAcao, (!clienteSelecionado || isDeleting) && styles.disabledButton]}
-                onPress={() => clienteSelecionado && router.push({ pathname: './Cadastrocliente', params: { id: clienteSelecionado.id } })}
-                disabled={!clienteSelecionado || isDeleting}
-            >
-                <MaterialCommunityIcons name="pencil-outline" size={22} color="#FFFFFF" />
-                <Text style={styles.textoBotaoAcao}>Editar</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-                style={[styles.botaoAcao, (!clienteSelecionado || isDeleting) && styles.disabledButton]}
-                onPress={() => clienteSelecionado && router.push({ pathname: './Vendascliente', params: { idCliente: clienteSelecionado.id, nome: clienteSelecionado.nome, telefone: clienteSelecionado.telefone } })}
-                disabled={!clienteSelecionado || isDeleting}
-            >
-                <MaterialCommunityIcons name="cash-multiple" size={22} color="#FFFFFF" />
-                <Text style={styles.textoBotaoAcao}>Vendas</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-                style={[styles.botaoAcao, styles.deleteButton, (!clienteSelecionado || isDeleting) && styles.disabledButton]}
-                onPress={handleExcluirCliente}
-                disabled={!clienteSelecionado || isDeleting}
-            >
-                {isDeleting && clienteSelecionado ?
-                    <ActivityIndicator size="small" color="#FFFFFF" /> :
-                    <MaterialCommunityIcons name="delete-outline" size={22} color="#FFFFFF" />
+        Alert.alert(
+            'Confirmar Exclusão',
+            `Tem certeza que deseja excluir o cliente "${clienteSelecionado.nome}"? Todas as vendas associadas também serão excluídas. Esta ação não pode ser desfeita.`,
+            [
+                { text: 'Cancelar', style: 'cancel', onPress: () => setClienteSelecionado(null) },
+                {
+                    text: 'Excluir Definitivamente',
+                    style: 'destructive',
+                    onPress: async () => {
+                        setIsDeleting(true);
+                        try {
+                            await excluirClienteSQLite(clienteSelecionado.id);
+                            Alert.alert('Sucesso', `Cliente "${clienteSelecionado.nome}" e suas vendas foram excluídos.`);
+                            setClienteSelecionado(null);
+                            await carregarClientesComLoading(false);
+                        } catch (error) {
+                            console.error('Falha ao excluir cliente:', error);
+                            Alert.alert('Erro Inesperado', 'Ocorreu um erro ao tentar excluir o cliente.');
+                        } finally {
+                            setIsDeleting(false);
+                        }
+                    }
                 }
-                <Text style={styles.textoBotaoAcao}>Excluir</Text>
-            </TouchableOpacity>
-        </View>
-      </SafeAreaView>
-    </ImageBackground>
-  );
+            ]
+        );
+    };
+
+    const renderItemCliente = ({ item }: { item: Cliente }) => (
+        <TouchableOpacity
+            style={[
+                styles.cardCliente,
+                clienteSelecionado?.id === item.id && styles.itemSelecionado,
+            ]}
+            onPress={() => clienteSelecionado?.id === item.id ? setClienteSelecionado(null) : setClienteSelecionado(item)}
+            disabled={isDeleting}
+        >
+            <View style={styles.iconContainer}>
+                <MaterialCommunityIcons name="account-circle-outline" size={32} color="#E0E0FF" />
+            </View>
+            <View style={styles.infoContainer}>
+                <Text style={styles.nomeCliente}>{item.nome}</Text>
+                {item.telefone ? <Text style={styles.detalheCliente}>{item.telefone}</Text> : null}
+                {item.email ? <Text style={styles.detalheCliente}>{item.email}</Text> : null}
+            </View>
+            <MaterialCommunityIcons
+                name={clienteSelecionado?.id === item.id ? "checkbox-marked-circle" : "checkbox-blank-circle-outline"}
+                size={24}
+                color={clienteSelecionado?.id === item.id ? "#4CAF50" : "#A9A9A9"}
+            />
+        </TouchableOpacity>
+    );
+
+    // ✨ Ecrã de carregamento de segurança
+    if (!isDbReady || (isLoading && !refreshing)) {
+        return (
+            <ImageBackground source={require("../../assets/images/fundo.jpg")} style={styles.background} blurRadius={2}>
+                <View style={styles.overlay} />
+                <View style={styles.loadingContainer}>
+                    <ActivityIndicator size="large" color="#FFFFFF" />
+                    <Text style={styles.loadingText}>A carregar clientes...</Text>
+                </View>
+            </ImageBackground>
+        );
+    }
+
+    return (
+        <ImageBackground source={require("../../assets/images/fundo.jpg")} style={styles.background} blurRadius={2}>
+            <View style={styles.overlay} />
+            <SafeAreaView style={styles.safeArea}>
+                <View style={styles.headerContainer}>
+                    <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
+                        <MaterialCommunityIcons name="arrow-left" size={24} color="#FFFFFF" />
+                    </TouchableOpacity>
+                    <Text style={styles.title}>Gerenciar Clientes</Text>
+                </View>
+
+                <FlatList
+                    data={clientes}
+                    keyExtractor={(item) => item.id}
+                    renderItem={renderItemCliente}
+                    ListEmptyComponent={
+                        <View style={styles.emptyListContainer}>
+                            <MaterialCommunityIcons name="account-search-outline" size={60} color="rgba(255,255,255,0.3)" />
+                            <Text style={styles.listaVaziaTexto}>Nenhum cliente cadastrado.</Text>
+                            <Text style={styles.listaVaziaSubtexto}>Clique em "Novo Cliente" para começar.</Text>
+                        </View>
+                    }
+                    contentContainerStyle={styles.listContentContainer}
+                    refreshControl={
+                        <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#FFFFFF" />
+                    }
+                />
+
+                <View style={[styles.footerAcoes, { paddingBottom: insets.bottom > 0 ? insets.bottom : 12 }]}>
+                    <TouchableOpacity
+                        style={[styles.botaoAcao, (isDeleting) && styles.disabledButton]}
+                        onPress={() => router.push('/(gcliente)/Cadastrocliente')}
+                        disabled={isDeleting}
+                    >
+                        <MaterialCommunityIcons name="account-plus-outline" size={22} color="#FFFFFF" />
+                        <Text style={styles.textoBotaoAcao}>Novo Cliente</Text>
+                    </TouchableOpacity>
+
+                    <TouchableOpacity
+                        style={[styles.botaoAcao, (!clienteSelecionado || isDeleting) && styles.disabledButton]}
+                        onPress={() => clienteSelecionado && router.push({ pathname: '/(gcliente)/Cadastrocliente', params: { id: clienteSelecionado.id } })}
+                        disabled={!clienteSelecionado || isDeleting}
+                    >
+                        <MaterialCommunityIcons name="pencil-outline" size={22} color="#FFFFFF" />
+                        <Text style={styles.textoBotaoAcao}>Editar</Text>
+                    </TouchableOpacity>
+
+                    <TouchableOpacity
+                        style={[styles.botaoAcao, (!clienteSelecionado || isDeleting) && styles.disabledButton]}
+                        onPress={() => clienteSelecionado && router.push({ pathname: '/(gcliente)/Vendascliente', params: { idCliente: clienteSelecionado.id, nome: clienteSelecionado.nome, telefone: clienteSelecionado.telefone } })}
+                        disabled={!clienteSelecionado || isDeleting}
+                    >
+                        <MaterialCommunityIcons name="cash-multiple" size={22} color="#FFFFFF" />
+                        <Text style={styles.textoBotaoAcao}>Vendas</Text>
+                    </TouchableOpacity>
+
+                    <TouchableOpacity
+                        style={[styles.botaoAcao, styles.deleteButton, (!clienteSelecionado || isDeleting) && styles.disabledButton]}
+                        onPress={handleExcluirCliente}
+                        disabled={!clienteSelecionado || isDeleting}
+                    >
+                        {isDeleting && clienteSelecionado ?
+                            <ActivityIndicator size="small" color="#FFFFFF" /> :
+                            <MaterialCommunityIcons name="delete-outline" size={22} color="#FFFFFF" />
+                        }
+                        <Text style={styles.textoBotaoAcao}>Excluir</Text>
+                    </TouchableOpacity>
+                </View>
+            </SafeAreaView>
+        </ImageBackground>
+    );
 }
 
 const styles = StyleSheet.create({
@@ -231,7 +236,6 @@ const styles = StyleSheet.create({
         flex: 1,
         justifyContent: 'center',
         alignItems: 'center',
-        marginTop: '30%',
     },
     listaVaziaTexto: {
         textAlign: 'center',
@@ -253,7 +257,7 @@ const styles = StyleSheet.create({
         right: 0,
         flexDirection: 'row',
         justifyContent: 'space-around',
-        paddingTop: 12, // Espaçamento superior
+        paddingTop: 12,
         paddingHorizontal: 10,
         backgroundColor: 'rgba(25, 10, 50, 0.85)',
         borderTopWidth: 1,
