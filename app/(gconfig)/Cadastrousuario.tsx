@@ -27,7 +27,7 @@ interface FormularioUsuarioProps {
 }
 
 // Componente para o Formulário de Usuário
-const FormularioUsuario = ({ usuarioEditando, onSave, onCancel, isSaving }: FormularioUsuarioProps) => { // ✨ 2. APLICA A INTERFACE AQUI
+const FormularioUsuario = ({ usuarioEditando, onSave, onCancel, isSaving }: FormularioUsuarioProps) => {
     const [username, setUsername] = useState(usuarioEditando?.username || '');
     const [password, setPassword] = useState('');
     const [confirmPassword, setConfirmPassword] = useState('');
@@ -55,10 +55,10 @@ const FormularioUsuario = ({ usuarioEditando, onSave, onCancel, isSaving }: Form
 
     return (
         <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={styles.formScrollContainer}>
-            <Text style={styles.formTitle}>{isEditing ? 'Editar Usuário' : 'Novo Usuário'}</Text>
+            <Text style={styles.formTitle}>{isEditing ? 'Editar usuário' : 'Novo usuário'}</Text>
             <TextInput
                 style={[styles.input, isEditing && styles.disabledInput]}
-                placeholder="Nome de Usuário"
+                placeholder="Nome de usuário"
                 value={username}
                 onChangeText={setUsername}
                 placeholderTextColor="#A9A9AA"
@@ -75,7 +75,7 @@ const FormularioUsuario = ({ usuarioEditando, onSave, onCancel, isSaving }: Form
             />
             <TextInput
                 style={styles.input}
-                placeholder="Confirme a Senha"
+                placeholder="Confirmar Nova Senha"
                 secureTextEntry
                 value={confirmPassword}
                 onChangeText={setConfirmPassword}
@@ -105,6 +105,10 @@ export default function GerenciarUsuariosScreen() {
     const [isPromptVisible, setIsPromptVisible] = useState(false);
     const [isVerifyingPassword, setIsVerifyingPassword] = useState(false);
     const [usuarioParaExcluir, setUsuarioParaExcluir] = useState<Usuario | null>(null);
+    
+    // Novos estados para guardar os dados da edição enquanto se confirma a senha
+    const [usuarioParaEditar, setUsuarioParaEditar] = useState<Usuario | null>(null);
+    const [novaSenhaTemp, setNovaSenhaTemp] = useState('');
 
     const router = useRouter();
     const { username: loggedInUsername } = useLocalSearchParams<{ username?: string }>();
@@ -132,6 +136,15 @@ export default function GerenciarUsuariosScreen() {
 
     const handleSalvarUsuario = async ({ username, password }: { username: string, password?: string }) => {
         const trimmedUsername = username.trim();
+
+        // Se estiver editando e uma nova senha foi digitada, pede a confirmação do admin
+        if (usuarioEditando && password) {
+            setUsuarioParaEditar(usuarioEditando);
+            setNovaSenhaTemp(password);
+            setIsPromptVisible(true); // Abre o modal de senha
+            return;
+        }
+
         setIsSaving(true);
         try {
             if (!usuarioEditando) {
@@ -142,19 +155,13 @@ export default function GerenciarUsuariosScreen() {
                     return;
                 }
             }
-            let passwordHash;
-            if (password) {
-                passwordHash = CryptoJS.SHA256(password).toString();
-            } else if (usuarioEditando) {
-                passwordHash = usuarioEditando.passwordHash;
-            } else {
-                setIsSaving(false);
-                return;
-            }
+            
+            const passwordHash = CryptoJS.SHA256(password!).toString();
             const usuarioParaSalvar: Usuario = {
                 username: trimmedUsername,
                 passwordHash: passwordHash,
             };
+
             await adicionarOuAtualizarUsuario(usuarioParaSalvar);
             await carregarUsuarios(false);
             setMostrarFormulario(false);
@@ -172,7 +179,7 @@ export default function GerenciarUsuariosScreen() {
             return;
         }
         if (usuario.username.toLowerCase() === loggedInUsername?.toLowerCase()) {
-            Alert.alert("Ação não permitida", "Você não pode excluir seu próprio usuário.");
+            Alert.alert("Ação não permitida", "Você não pode excluir o seu próprio usuário.");
             return;
         }
         setUsuarioParaExcluir(usuario);
@@ -180,38 +187,46 @@ export default function GerenciarUsuariosScreen() {
     };
 
     const handlePasswordSubmit = async (password: string) => {
-        if (!password || !loggedInUsername || !usuarioParaExcluir) {
+        if (!password || !loggedInUsername) {
             setIsPromptVisible(false);
             return;
         }
+
         setIsVerifyingPassword(true);
         try {
             const adminUser = await buscarUsuarioPorUsernameSQLite(loggedInUsername);
             if (!adminUser) throw new Error("Usuário admin não encontrado.");
+
             const passwordHashDigitado = CryptoJS.SHA256(password).toString();
-            if (passwordHashDigitado === adminUser.passwordHash) {
+            if (passwordHashDigitado !== adminUser.passwordHash) {
+                Alert.alert("Senha Incorreta", "A senha digitada não confere. A operação foi cancelada.");
                 setIsPromptVisible(false);
-                Alert.alert('Confirmar Exclusão Final', `Senha confirmada. Deseja realmente excluir o usuário "${usuarioParaExcluir.username}"?`,
-                    [
-                        { text: 'Cancelar', style: 'cancel', onPress: () => setUsuarioParaExcluir(null) },
-                        { text: 'Excluir', style: 'destructive',
-                            onPress: async () => {
-                                await excluirUsuario(usuarioParaExcluir.username);
-                                await carregarUsuarios(false);
-                                setUsuarioParaExcluir(null);
-                            }
-                        }
-                    ]
-                );
-            } else {
-                Alert.alert("Senha Incorreta", "A senha digitada não confere. A exclusão foi cancelada.");
-                setIsPromptVisible(false);
+                return;
             }
+
+            // Se a senha estiver correta, decide qual ação tomar
+            if (usuarioParaExcluir) {
+                await excluirUsuario(usuarioParaExcluir.username);
+                Alert.alert("Sucesso", `Usuário "${usuarioParaExcluir.username}" excluído.`);
+            } else if (usuarioParaEditar) {
+                const hashNovaSenha = CryptoJS.SHA256(novaSenhaTemp).toString();
+                const usuarioAtualizado = { ...usuarioParaEditar, passwordHash: hashNovaSenha };
+                await adicionarOuAtualizarUsuario(usuarioAtualizado);
+                Alert.alert("Sucesso", `Senha do usuário "${usuarioParaEditar.username}" alterada.`);
+            }
+            
+            setIsPromptVisible(false);
+            await carregarUsuarios(false);
+            setMostrarFormulario(false);
+
         } catch (error) {
             Alert.alert("Erro de Verificação", "Ocorreu um erro ao verificar a senha.");
             setIsPromptVisible(false);
         } finally {
             setIsVerifyingPassword(false);
+            setUsuarioParaExcluir(null);
+            setUsuarioParaEditar(null);
+            setNovaSenhaTemp('');
         }
     };
 
@@ -242,6 +257,10 @@ export default function GerenciarUsuariosScreen() {
             </ImageBackground>
         );
     }
+
+    const modalMessage = usuarioParaExcluir 
+        ? `Para excluir o usuário "${usuarioParaExcluir.username}", digite a sua senha de administrador.`
+        : `Para alterar a senha de "${usuarioParaEditar?.username}", digite a sua senha de administrador.`;
 
     return (
         <ImageBackground source={require('../../assets/images/fundo.jpg')} style={styles.background} blurRadius={2}>
@@ -294,7 +313,7 @@ export default function GerenciarUsuariosScreen() {
                     onClose={() => setIsPromptVisible(false)}
                     onSubmit={handlePasswordSubmit}
                     title="Confirmar Ação"
-                    message={`Para excluir o usuário "${usuarioParaExcluir?.username}", digite sua senha de administrador.`}
+                    message={modalMessage}
                     isSubmitting={isVerifyingPassword}
                 />
             </SafeAreaView>

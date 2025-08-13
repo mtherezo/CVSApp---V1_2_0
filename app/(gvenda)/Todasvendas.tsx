@@ -1,14 +1,15 @@
-//Todasvendas.tsx
 import React, { useState, useCallback, useMemo } from 'react';
 import { View, Text, FlatList, StyleSheet, TouchableOpacity, Alert, ImageBackground, ActivityIndicator, RefreshControl, Platform, SafeAreaView, StatusBar, TextInput } from 'react-native';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { listarTodasVendasSQLite, excluirVendaSQLite } from '../../src/database/sqlite';
 import { Venda } from '../../src/types';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 type FiltroStatus = 'todas' | 'pendentes' | 'parciais' | 'quitadas';
 
 export default function TodasVendasScreen() {
+    const insets = useSafeAreaInsets();
     const [vendas, setVendas] = useState<Venda[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
@@ -60,7 +61,7 @@ export default function TodasVendasScreen() {
                 const termo = termoBusca.toLowerCase();
                 if (!termo) return true;
                 return venda.clienteNome.toLowerCase().includes(termo) ||
-                       venda.itens.some(item => item.descricao.toLowerCase().includes(termo));
+                       (venda.itens || []).some(item => item.descricao.toLowerCase().includes(termo));
             });
     }, [vendas, filtroAtivo, termoBusca]);
 
@@ -82,18 +83,22 @@ export default function TodasVendasScreen() {
         const valorPagoNestaVenda = calcularValorPago(item);
         const saldoDevedorItem = item.valorTotal - valorPagoNestaVenda;
 
-        //  LÓGICA PARA DETERMINAR O STATUS E O ESTILO
+        // ✨ LÓGICA PARA DETERMINAR O STATUS E O ESTILO
         const getStatusInfo = () => {
             if (saldoDevedorItem <= 0.001) {
-                return { text: 'Pagamento Quitado', style: styles.statusQuitada };
+                return { text: 'Quitada', style: styles.statusQuitada };
             }
             if (valorPagoNestaVenda > 0) {
-                return { text: 'Pagamento Parcial', style: styles.statusParcial };
+                return { text: 'Parcial', style: styles.statusParcial };
             }
-            return { text: 'Pagamento Pendente', style: styles.statusPendente };
+            return { text: 'Pendente', style: styles.statusPendente };
         };
 
         const statusInfo = getStatusInfo();
+        
+        const ultimoPagamento = item.pagamentos && item.pagamentos.length > 0
+            ? item.pagamentos.sort((a, b) => new Date(b.dataPagamento).getTime() - new Date(a.dataPagamento).getTime())[0]
+            : null;
 
         return (
             <TouchableOpacity
@@ -108,7 +113,7 @@ export default function TodasVendasScreen() {
                         </View>
                         {item.tipoPagamento === 'Parcelado' && (
                             <Text style={styles.parcelaStatus}>
-                                {`Parcelas: ${item.parcelasPagas || 0} de ${item.parcelasTotais}`}
+                                {`Parcelas: ${item.pagamentos?.length || 0} de ${item.parcelasTotais}`}
                             </Text>
                         )}
                     </View>
@@ -141,6 +146,13 @@ export default function TodasVendasScreen() {
                     <Text style={styles.valorMontante}>R$ {valorPagoNestaVenda.toFixed(2)}</Text>
                     <Text style={styles.valorLabel}>Pendente:</Text>
                     <Text style={[styles.valorMontante, saldoDevedorItem > 0 ? styles.textoPendente : styles.textoQuitado]}>R$ {saldoDevedorItem.toFixed(2)}</Text>
+                    {ultimoPagamento && (
+                        <>
+                            <Text style={styles.valorLabel}>Data último Pag:</Text>
+                            <Text style={[styles.valorMontante, styles.itemData]}>{new Date(ultimoPagamento.dataPagamento).toLocaleDateString('pt-BR')}
+                            </Text>
+                        </>
+                    )}
                 </View>
             </TouchableOpacity>
         );
@@ -174,6 +186,17 @@ export default function TodasVendasScreen() {
                             <View style={[styles.progressoBarra, { width: `${Math.min(100, percentualPago)}%` }]} />
                         </View>
                     </View>
+                </View>
+                
+                <View style={styles.buscaContainer}>
+                    <MaterialCommunityIcons name="magnify" size={22} color="#A9A9A9" style={styles.buscaIcon} />
+                    <TextInput
+                        style={styles.buscaInput}
+                        placeholder="Buscar por cliente ou produto..."
+                        value={termoBusca}
+                        onChangeText={setTermoBusca}
+                        placeholderTextColor="#A9A9A9"
+                    />
                 </View>
 
                 <View style={styles.filtroContainer}>
@@ -216,7 +239,11 @@ export default function TodasVendasScreen() {
                             </Text>
                         </View>
                     }
-                    contentContainerStyle={vendas.length === 0 ? styles.emptyListContainerStyle : styles.listContentContainer}
+                    
+                    contentContainerStyle={[
+                        vendas.length === 0 ? styles.emptyListContainerStyle : styles.listContentContainer,
+                        { paddingBottom: insets.bottom + 20 } // Adiciona espaço extra na base
+                    ]}
                     refreshControl={
                         <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#FFFFFF" />
                     }
@@ -246,7 +273,33 @@ const styles = StyleSheet.create({
     progressoTexto: { fontSize: 14, color: '#FFFFFF', fontWeight: 'bold', },
     progressoContainer: { height: 12, backgroundColor: 'rgba(0,0,0,0.3)', borderRadius: 6, overflow: 'hidden', },
     progressoBarra: { height: '100%', backgroundColor: '#4CAF50', borderRadius: 6, },
-    filtroContainer: { flexDirection: 'row', justifyContent: 'space-around', paddingHorizontal: 16, marginBottom: 20, },
+    buscaContainer: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: 'rgba(0,0,0,0.25)',
+        borderRadius: 12,
+        paddingHorizontal: 15,
+        borderWidth: 1,
+        borderColor: 'rgba(255,255,255,0.2)',
+        marginHorizontal: 16,
+        marginBottom: 15,
+    },
+    buscaIcon: {
+        marginRight: 10,
+    },
+    buscaInput: {
+        flex: 1,
+        paddingVertical: 12,
+        fontSize: 16,
+        color: '#FFFFFF',
+    },
+    filtroContainer: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: 4,
+    marginBottom: 20,
+    paddingHorizontal: 16,
+},
     filtroBotao: { paddingVertical: 8, paddingHorizontal: 16, borderRadius: 20, backgroundColor: 'rgba(255, 255, 255, 0.1)', borderWidth: 1, borderColor: 'rgba(255, 255, 255, 0.2)', },
     filtroTexto: { color: '#FFFFFF', fontWeight: 'bold', fontSize: 13, },
     filtroTodasAtivo: { backgroundColor: '#81D4FA', borderColor: '#81D4FA', },
@@ -276,4 +329,5 @@ const styles = StyleSheet.create({
     divisorFinanceiro: { height: 1, backgroundColor: 'rgba(255, 255, 255, 0.15)', width: '100%', marginVertical: 8, },
     emptyListContainer: { justifyContent: 'center', alignItems: 'center', paddingTop: '20%' },
     emptyListText: { textAlign: 'center', fontSize: 18, fontWeight: 'bold', color: 'rgba(255,255,255,0.7)', marginTop: 15 },
+    itemData: { fontSize: 14, fontStyle: 'italic' },
 });
