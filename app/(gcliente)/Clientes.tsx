@@ -1,12 +1,13 @@
 //Clientes.tsx
 import React, { useState, useCallback, useEffect } from 'react';
-import { View, Text, FlatList, StyleSheet, TouchableOpacity, Alert, ImageBackground, ActivityIndicator, RefreshControl, Platform, SafeAreaView, StatusBar,} from 'react-native';
+import { View, FlatList, StyleSheet, TouchableOpacity, Alert, ImageBackground, ActivityIndicator, RefreshControl, Platform, SafeAreaView, StatusBar,} from 'react-native';
+import { StyledText as Text } from '../../src/components/StyledText';
 import { Cliente } from '../../src/types';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { listarClientesSQLite, excluirClienteSQLite } from '../../src/database/sqlite';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useAppContext } from '../../src/contexts/AppContext'; // ✨ 1. Importa o hook do contexto
+import { useAppContext } from '../../src/contexts/AppContext';
 
 export default function ClientesScreen() {
     const [clientes, setClientes] = useState<Cliente[]>([]);
@@ -16,7 +17,7 @@ export default function ClientesScreen() {
     const [refreshing, setRefreshing] = useState(false);
     const router = useRouter();
     const insets = useSafeAreaInsets();
-    const { isDbReady } = useAppContext(); // ✨ 2. Obtém o status de prontidão do banco de dados
+    const { isDbReady } = useAppContext(); // Obtém o status de prontidão do banco de dados
 
     const carregarClientesComLoading = async (showLoader = true) => {
         if (showLoader) setIsLoading(true);
@@ -39,7 +40,7 @@ export default function ClientesScreen() {
 
     useFocusEffect(
         useCallback(() => {
-            // ✨ 3. CONDIÇÃO DE SEGURANÇA ADICIONADA
+            // CONDIÇÃO DE SEGURANÇA ADICIONADA
             // Só tenta carregar os clientes DEPOIS que o banco de dados estiver 100% pronto.
             if (isDbReady) {
                 carregarClientesComLoading();
@@ -197,10 +198,10 @@ const styles = StyleSheet.create({
     overlay: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(25, 10, 50, 0.65)' },
     safeArea: { flex: 1, paddingTop: Platform.OS === 'android' ? StatusBar.currentHeight : 0 },
     loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-    loadingText: { marginTop: 10, color: '#FFFFFF', fontSize: 16 },
+    loadingText: { marginTop: 10, color: '#FFFFFF', fontSize: 16, fontFamily: 'Roboto-Regular' },
     headerContainer: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 10, paddingVertical: 10 },
     backButton: { padding: 8 },
-    title: { fontSize: 26, fontWeight: 'bold', color: '#FFFFFF', textAlign: 'center', flex: 1, marginRight: 40 },
+    title: { fontSize: 26, color: '#FFFFFF', textAlign: 'center', flex: 1, marginRight: 40, fontFamily: 'Roboto-Bold' },
     listContentContainer: { paddingHorizontal: 16, paddingBottom: 100 },
     cardCliente: {
         backgroundColor: 'rgba(255, 255, 255, 0.1)',
@@ -224,13 +225,14 @@ const styles = StyleSheet.create({
     },
     nomeCliente: {
         fontSize: 18,
-        fontWeight: 'bold',
         color: '#FFFFFF',
+        fontFamily: 'Roboto-Bold',
     },
     detalheCliente: {
         fontSize: 14,
         color: '#E0E0FF',
         marginTop: 2,
+        fontFamily: 'Roboto-Regular',
     },
     emptyListContainer: {
         flex: 1,
@@ -240,15 +242,16 @@ const styles = StyleSheet.create({
     listaVaziaTexto: {
         textAlign: 'center',
         fontSize: 18,
-        fontWeight: 'bold',
         color: 'rgba(255,255,255,0.7)',
         marginTop: 15,
+        fontFamily: 'Roboto-Bold',
     },
     listaVaziaSubtexto: {
         textAlign: 'center',
         fontSize: 15,
         color: 'rgba(255,255,255,0.5)',
         marginTop: 5,
+        fontFamily: 'Roboto-Regular',
     },
     footerAcoes: {
         position: 'absolute',
@@ -271,6 +274,7 @@ const styles = StyleSheet.create({
         color: 'white',
         fontSize: 12,
         marginTop: 8,
+        fontFamily: 'Roboto-Regular',
     },
     deleteButton: {},
     disabledButton: {

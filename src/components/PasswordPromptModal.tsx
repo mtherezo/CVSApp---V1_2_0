@@ -1,6 +1,7 @@
 // PasswordPromptModal.tsx
 import React, { useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, Modal, StyleSheet, ActivityIndicator } from 'react-native';
+import { View, TextInput, TouchableOpacity, Modal, StyleSheet, ActivityIndicator } from 'react-native';
+import { StyledText as Text } from '../../src/components/StyledText';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 
 interface PasswordPromptModalProps {

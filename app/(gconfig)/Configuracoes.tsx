@@ -1,6 +1,7 @@
 // app/Configuracoes.tsx
 import React from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, ImageBackground, SafeAreaView, StatusBar, Platform, ScrollView, Alert } from 'react-native';
+import { View, TouchableOpacity, StyleSheet, ImageBackground, SafeAreaView, StatusBar, Platform, ScrollView, Alert } from 'react-native';
+import { StyledText as Text } from '../../src/components/StyledText';
 import { useRouter, useLocalSearchParams, Href } from 'expo-router';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import * as Linking from 'expo-linking';
@@ -83,7 +84,7 @@ const styles = StyleSheet.create({
     safeArea: { flex: 1, paddingTop: Platform.OS === 'android' ? StatusBar.currentHeight : 0 },
     headerContainer: { flexDirection: 'row', alignItems: 'center', paddingVertical: 10, paddingHorizontal: 10, borderBottomWidth: 1, borderBottomColor: 'rgba(255, 255, 255, 0.1)' },
     backButton: { padding: 8 },
-    title: { fontSize: 26, fontWeight: 'bold', color: '#FFFFFF', textAlign: 'center', flex: 1, marginRight: 40 },
+    title: { fontSize: 26,  fontFamily: 'Roboto-Bold', color: '#FFFFFF', textAlign: 'center', flex: 1, marginRight: 40 },
     scrollContainer: { paddingHorizontal: 16, paddingTop: 20 },
     // Estilo de lista (menu) em vez de grade
     menuButton: {

@@ -1,6 +1,7 @@
 //Pesquisarvendascliente.tsx
 import React, { useState, useEffect } from 'react';
-import { View, Text, TextInput, FlatList, TouchableOpacity, StyleSheet, ImageBackground, ActivityIndicator, Platform, SafeAreaView, Alert, StatusBar,} from 'react-native';
+import { View, TextInput, FlatList, TouchableOpacity, StyleSheet, ImageBackground, ActivityIndicator, Platform, SafeAreaView, Alert, StatusBar,} from 'react-native';
+import { StyledText as Text } from '../../src/components/StyledText';
 import { useRouter } from 'expo-router';
 import { Cliente } from '../../src/types';
 import { pesquisarClientesPorNomeSQLite } from '../../src/database/sqlite';
@@ -151,7 +152,7 @@ const styles = StyleSheet.create({
   safeArea: { flex: 1, paddingTop: Platform.OS === 'android' ? StatusBar.currentHeight : 0 },
   headerContainer: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 10, paddingVertical: 10 },
   backButton: { padding: 8, marginRight: 10 },
-  title: { fontSize: 26, fontWeight: 'bold', color: '#FFFFFF', textAlign: 'center', flex: 1, marginRight: 40 },
+  title: { fontSize: 26, fontFamily: 'Roboto-Bold', color: '#FFFFFF', textAlign: 'center', flex: 1, marginRight: 40 },
   container: {
     flex: 1,
     paddingHorizontal: 16,
@@ -179,7 +180,8 @@ const styles = StyleSheet.create({
     paddingVertical: 14, 
     paddingHorizontal: 10,
     fontSize: 16, 
-    color: '#FFFFFF', 
+    color: '#FFFFFF',
+    fontFamily: 'Roboto-Regular',
   },
   searchButton: {
     backgroundColor: 'rgba(3, 218, 198, 0.8)',
@@ -194,7 +196,7 @@ const styles = StyleSheet.create({
   searchButtonText: {
     color: '#FFFFFF',
     fontSize: 16,
-    fontWeight: 'bold',
+    fontFamily: 'Roboto-Regular',
   },
   cardCliente: {
     backgroundColor: 'rgba(255, 255, 255, 0.1)',
@@ -217,7 +219,7 @@ const styles = StyleSheet.create({
   },
   nomeCliente: {
       fontSize: 18,
-      fontWeight: 'bold',
+      fontFamily: 'Roboto-Bold',
       color: '#FFFFFF',
   },
   detalheCliente: {
@@ -234,7 +236,7 @@ const styles = StyleSheet.create({
   emptyListText: {
       textAlign: 'center',
       fontSize: 18,
-      fontWeight: 'bold',
+      fontFamily: 'Roboto-Bold',
       color: 'rgba(255,255,255,0.7)',
       marginTop: 15,
   },

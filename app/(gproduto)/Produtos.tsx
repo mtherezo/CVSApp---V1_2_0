@@ -1,5 +1,6 @@
 import React, { useState, useCallback, useMemo } from 'react';
-import { View, Text, FlatList, StyleSheet, TouchableOpacity, Alert, ImageBackground, ActivityIndicator, RefreshControl, Platform, SafeAreaView, StatusBar, TextInput, KeyboardAvoidingView, ScrollView, Image } from 'react-native';
+import { View, FlatList, StyleSheet, TouchableOpacity, Alert, ImageBackground, ActivityIndicator, RefreshControl, Platform, SafeAreaView, StatusBar, TextInput, KeyboardAvoidingView, ScrollView, Image } from 'react-native';
+import { StyledText as Text } from '../../src/components/StyledText';
 import { Produto } from '../../src/types';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { listarProdutosSQLite, cadastrarProdutoSQLite, excluirProdutoSQLite } from '../../src/database/sqlite';
@@ -7,6 +8,7 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import * as Crypto from 'expo-crypto';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as ImagePicker from 'expo-image-picker';
+import { commonStyles } from '../../src/theme/commonStyles';
 
 // Define os tipos de filtro de Estoque
 type FiltroEstoqueStatus = 'todos' | 'emEstoque' | 'semEstoque';
@@ -87,13 +89,13 @@ const FormularioProduto = ({ produtoEditando, onSave, onCancel, isSaving }: Form
                     )}
                 </TouchableOpacity>
 
-                <TextInput style={styles.input} placeholder="Descrição do Produto*" value={descricao} onChangeText={setDescricao} placeholderTextColor="#A9A9A9" />
-                <TextInput style={styles.input} placeholder="Marca" value={marca} onChangeText={setMarca} placeholderTextColor="#A9A9A9" autoCapitalize="words" />
+                <TextInput style={commonStyles.input} placeholder="Descrição do Produto*" value={descricao} onChangeText={setDescricao} placeholderTextColor="#A9A9A9" />
+                <TextInput style={commonStyles.input} placeholder="Marca" value={marca} onChangeText={setMarca} placeholderTextColor="#A9A9A9" autoCapitalize="words" />
                 <View style={styles.inputRow}>
-                    <TextInput style={[styles.input, {flex: 1}]} placeholder="Código" value={codigo} onChangeText={setCodigo} placeholderTextColor="#A9A9A9" />
-                    <TextInput style={[styles.input, {flex: 1}]} placeholder="Estoque" value={quantidadeEstoque} onChangeText={setQuantidadeEstoque} keyboardType="number-pad" placeholderTextColor="#A9A9A9" />
+                    <TextInput style={[commonStyles.input, {flex: 1}]} placeholder="Código" value={codigo} onChangeText={setCodigo} placeholderTextColor="#A9A9A9" />
+                    <TextInput style={[commonStyles.input, {flex: 1}]} placeholder="Estoque" value={quantidadeEstoque} onChangeText={setQuantidadeEstoque} keyboardType="number-pad" placeholderTextColor="#A9A9A9" />
                 </View>
-                <TextInput style={styles.input} placeholder="Valor (R$)" value={valor} onChangeText={setValor} keyboardType="decimal-pad" placeholderTextColor="#A9A9A9" />
+                <TextInput style={commonStyles.input} placeholder="Valor (R$)" value={valor} onChangeText={setValor} keyboardType="decimal-pad" placeholderTextColor="#A9A9A9" />
                 
                 <View style={styles.formActions}>
                     <TouchableOpacity style={[styles.formButton, styles.cancelButton]} onPress={onCancel} disabled={isSaving}>
@@ -296,7 +298,7 @@ const styles = StyleSheet.create({
     loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
     headerContainer: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 10, paddingVertical: 10, },
     backButton: { padding: 8 },
-    title: { fontSize: 26, fontWeight: 'bold', color: '#FFFFFF', textAlign: 'center', flex: 1, marginRight: 40 },
+    title: { fontSize: 26, fontFamily: 'Roboto-Bold', color: '#FFFFFF', textAlign: 'center', flex: 1, marginRight: 40 },
     controlesContainer: {
         paddingHorizontal: 16,
         paddingTop: 10,
@@ -318,6 +320,7 @@ const styles = StyleSheet.create({
         paddingVertical: 14,
         fontSize: 16,
         color: '#FFFFFF',
+        fontFamily: 'Roboto-Regular',
     },
     filtroContainer: {
         flexDirection: 'row',
@@ -339,39 +342,38 @@ const styles = StyleSheet.create({
     },
     filtroTexto: {
         color: '#FFFFFF',
-        //fontWeight: 'bold',
         fontSize: 13,
+        fontFamily: 'Roboto-Regular',
     },
     listContentContainer: { paddingHorizontal: 16, paddingBottom: 120 },
     emptyContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', marginTop: '20%' },
-    emptyText: { fontSize: 18, color: 'rgba(255,255,255,0.7)' },
+    emptyText: { fontSize: 18, fontFamily: 'Roboto-Bold', color: 'rgba(255,255,255,0.7)' },
     card: { backgroundColor: 'rgba(255, 255, 255, 0.1)', borderRadius: 12, padding: 15, marginBottom: 12, flexDirection: 'row', alignItems: 'center' },
     cardImage: { width: 60, height: 60, borderRadius: 8, marginRight: 15, backgroundColor: 'rgba(0,0,0,0.2)' },
     cardImagePlaceholder: { width: 60, height: 60, borderRadius: 8, marginRight: 15, backgroundColor: 'rgba(0,0,0,0.2)', justifyContent: 'center', alignItems: 'center' },
     cardInfo: { flex: 1, justifyContent: 'center' },
-    cardTitle: { fontSize: 16, fontWeight: 'bold', color: '#FFFFFF' },
-    cardSubtitle: { fontSize: 14, color: '#BDBDBD', marginTop: 2 },
+    cardTitle: { fontSize: 16,fontFamily: 'Roboto-Bold', color: '#FFFFFF' },
+    cardSubtitle: { fontSize: 14,fontFamily: 'Roboto-Regular', color: '#BDBDBD', marginTop: 2 },
     cardDetailsRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 8 },
-    cardValue: { fontSize: 16, color: '#E0E0FF', fontWeight: '500' },
-    cardStock: { fontSize: 14, color: '#FFCC80', fontWeight: 'bold' },
+    cardValue: { fontSize: 16, fontFamily: 'Roboto-Bold', color: '#E0E0FF', },
+    cardStock: { fontSize: 14, fontFamily: 'Roboto-Bold', color: '#FFCC80', },
     cardActions: { flexDirection: 'column', justifyContent: 'space-around', marginLeft: 10 },
     actionButton: { padding: 8 },
     footer: { position: 'absolute', bottom: 0, left: 0, right: 0, paddingTop: 20, paddingHorizontal: 20, backgroundColor: 'rgba(25, 10, 50, 0.9)', borderTopWidth: 1, borderTopColor: 'rgba(255, 255, 255, 0.1)' },
     addButton: { backgroundColor: '#4CAF50', flexDirection: 'row', paddingVertical: 15, borderRadius: 25, alignItems: 'center', justifyContent: 'center' },
-    addButtonText: { color: 'white', fontSize: 17, fontWeight: 'bold', marginLeft: 10 },
+    addButtonText: { color: 'white', fontSize: 17, fontFamily: 'Roboto-Bold', marginLeft: 10 },
     formContainer: { flex: 1, },
     formScrollContainer: { padding: 20 },
-    formTitle: { fontSize: 22, fontWeight: 'bold', color: '#FFFFFF', marginBottom: 20, textAlign: 'center' },
+    formTitle: { fontSize: 22, fontFamily: 'Roboto-Bold', color: '#FFFFFF', marginBottom: 20, textAlign: 'center' },
     imagePicker: { width: 120, height: 120, borderRadius: 12, backgroundColor: 'rgba(0,0,0,0.25)', alignSelf: 'center', marginBottom: 20, justifyContent: 'center', alignItems: 'center', overflow: 'hidden' },
     productImage: { width: '100%', height: '100%' },
     imagePlaceholder: { justifyContent: 'center', alignItems: 'center' },
     imagePlaceholderText: { color: '#A9A9A9', marginTop: 5 },
-    input: { backgroundColor: 'rgba(0,0,0,0.25)', borderRadius: 12, padding: 15, fontSize: 16, color: '#FFFFFF', marginBottom: 15 },
     inputRow: { flexDirection: 'row', gap: 10 },
     formActions: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 10 },
     formButton: { flex: 1, padding: 15, borderRadius: 12, alignItems: 'center' },
     cancelButton: { backgroundColor: '#555', marginRight: 10 },
     saveButton: { backgroundColor: '#4CAF50' },
     disabledButton: { opacity: 0.6 },
-    formButtonText: { color: '#FFFFFF', fontWeight: 'bold', fontSize: 16 },
+    formButtonText: { color: '#FFFFFF', fontFamily: 'Roboto-Bold',  fontSize: 16 },
 });

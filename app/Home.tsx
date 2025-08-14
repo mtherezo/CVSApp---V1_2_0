@@ -1,6 +1,7 @@
 // Home.tsx
 import { useLocalSearchParams, useRouter, Href } from "expo-router";
-import { ImageBackground, View, Text, TouchableOpacity, StyleSheet, Platform, SafeAreaView, ScrollView, Alert, StatusBar} from "react-native";
+import { ImageBackground, View,  TouchableOpacity, StyleSheet, Platform, SafeAreaView, ScrollView, Alert, StatusBar} from "react-native";
+import { StyledText as Text } from '../src/components/StyledText';
 import React from 'react';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import Constants from 'expo-constants';
@@ -101,7 +102,7 @@ const styles = StyleSheet.create({
     scrollContainer: { flexGrow: 1, paddingHorizontal: 20, paddingVertical: 30, },
     headerContainer: { alignItems: 'center', marginBottom: 30, },
     title: { fontSize: 24, fontWeight: '300', color: "#E0E0FF", textAlign: "center", },
-    usernameText: { fontSize: 32, fontWeight: 'bold', color: "#FFFFFF", textAlign: "center", },
+    usernameText: { fontSize: 32,  color: "#FFFFFF", textAlign: "center",fontFamily: 'Roboto-Bold' },
     buttonGrid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', },
     gridButton: {
         backgroundColor: 'rgba(255, 255, 255, 0.1)',
@@ -137,8 +138,8 @@ const styles = StyleSheet.create({
         textAlign: "center",
         color: '#FFDDC5',
         fontSize: 17,
-        fontWeight: 'bold',
         marginLeft: 10,
+        fontFamily: 'Roboto-Bold',
     },
     versionText: {
         textAlign: 'center',

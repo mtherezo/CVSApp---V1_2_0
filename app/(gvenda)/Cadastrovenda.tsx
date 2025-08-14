@@ -1,8 +1,9 @@
 import React, { useState, useCallback, useEffect } from 'react';
 import {
-    View, Text, TextInput, TouchableOpacity, StyleSheet, Alert, ImageBackground,
+    View, TextInput, TouchableOpacity, StyleSheet, Alert, ImageBackground,
     Platform, KeyboardAvoidingView, ActivityIndicator, ScrollView, SafeAreaView, StatusBar, FlatList
 } from 'react-native';
+import { StyledText as Text } from '../../src/components/StyledText';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { 
     cadastrarVendaSQLite as cadastrarVenda, 
@@ -32,7 +33,7 @@ const MemoizedItemAdicionado = React.memo(({ item, onRemove }: { item: ItemVenda
     );
 });
 
-// Componente do catálogo agora mostra o stock
+// Componente do catálogo agora mostra o estoque 
 const CatalogoProdutosView = ({ produtos, onSelect, onClose }: { produtos: Produto[], onSelect: (produto: Produto) => void, onClose: () => void }) => {
     const [termoBusca, setTermoBusca] = useState('');
     const produtosFiltrados = produtos.filter(p => p.descricao.toLowerCase().includes(termoBusca.toLowerCase()));
@@ -54,13 +55,13 @@ const CatalogoProdutosView = ({ produtos, onSelect, onClose }: { produtos: Produ
                 data={produtosFiltrados}
                 keyExtractor={(item) => item.id}
                 renderItem={({ item }) => (
-                    <TouchableOpacity style={styles.productListItem} onPress={() => onSelect(item)}>
+                    <TouchableOpacity style={styles.produtoListItem} onPress={() => onSelect(item)}>
                         <View style={{flex: 1}}>
-                            <Text style={styles.productListItemDesc}>{item.descricao}</Text>
-                            <Text style={styles.productListItemValue}>{`R$ ${item.valor.toFixed(2)}`}</Text>
+                            <Text style={styles.produtoListItemDesc}>{item.descricao}</Text>
+                            <Text style={styles.produtoListItemValue}>{`R$ ${item.valor.toFixed(2)}`}</Text>
                         </View>
-                        <Text style={[styles.productStockText, (item.quantidadeEstoque || 0) <= 0 && styles.outOfStockText]}>
-                            Stock: {item.quantidadeEstoque || 0}
+                        <Text style={[styles.produtoEstoqueText, (item.quantidadeEstoque || 0) <= 0 && styles.fimEstoqueText]}>
+                            Estoque: {item.quantidadeEstoque || 0}
                         </Text>
                     </TouchableOpacity>
                 )}
@@ -177,13 +178,19 @@ export default function CadastroVendaScreen() {
         try {
             // --- 1. VERIFICAÇÃO DE ESTOQUE ---
             for (const itemVenda of itens) {
-                if (itemVenda.idProduto) { // Só verifica estoque de produtos do catálogo
+                if (itemVenda.idProduto) { // Só verifica stoque de produtos do catálogo
                     const produtoCatalogo = catalogoProdutos.find(p => p.id === itemVenda.idProduto);
                     const estoqueDisponivel = produtoCatalogo?.quantidadeEstoque || 0;
                     const quantidadeOriginal = vendaOriginal?.itens.find(i => i.idProduto === itemVenda.idProduto)?.quantidade || 0;
                     
                     if (itemVenda.quantidade > estoqueDisponivel + quantidadeOriginal) {
-                        throw new Error(`Stock insuficiente para "${itemVenda.descricao}". Disponível: ${estoqueDisponivel}.`);
+                        // ✨ CORREÇÃO: Mostra um alerta e para a função, em vez de lançar um erro.
+                        Alert.alert(
+                            "Estoque Insuficiente",
+                            `Não há Estoque suficiente para "${itemVenda.descricao}".\nDisponível: ${estoqueDisponivel}.`
+                        );
+                        setIsSaving(false); // Para o indicador de carregamento
+                        return; // Para a execução da função de forma segura
                     }
                 }
             }
@@ -217,7 +224,7 @@ export default function CadastroVendaScreen() {
 
             if (!vendaSalva) throw new Error("Falha ao salvar a venda.");
 
-            // --- 4. ATUALIZA O STOCK NO BANCO DE DADOS ---
+            // --- 4. ATUALIZA O ESTOQUE NO BANCO DE DADOS ---
             for (const [idProduto, quantidade] of mudancasEstoque.entries()) {
                 if (quantidade !== 0) {
                     await atualizarEstoqueProdutoSQLite(idProduto, quantidade);
@@ -283,9 +290,9 @@ export default function CadastroVendaScreen() {
                                         <CatalogoProdutosView produtos={catalogoProdutos} onSelect={handleSelecionarProduto} onClose={() => setCatalogoVisivel(false)} />
                                     ) : (
                                         <>
-                                            <TouchableOpacity style={styles.selectProductButton} onPress={() => setCatalogoVisivel(true)}>
+                                            <TouchableOpacity style={styles.selectProdutoButton} onPress={() => setCatalogoVisivel(true)}>
                                                 <MaterialCommunityIcons name="tag-search-outline" size={22} color="#FFFFFF" />
-                                                <Text style={styles.selectProductButtonText}>Selecionar Produto do Catálogo</Text>
+                                                <Text style={styles.selectProdutoButtonText}>Selecionar Produto do Catálogo</Text>
                                             </TouchableOpacity>
                                             <Text style={styles.orText}>- ou adicione um item avulso abaixo -</Text>
                                             <View style={styles.inputContainer}>
@@ -397,18 +404,18 @@ const styles = StyleSheet.create({
     dateSelectorLabel: { fontSize: 16, color: '#E0E0FF', fontWeight: '500' },
     datePickerButton: { flexDirection: 'row', alignItems: 'center', backgroundColor: 'rgba(0, 0, 0, 0.25)', borderRadius: 12, paddingVertical: 10, paddingHorizontal: 15, borderWidth: 1, borderColor: 'rgba(255, 255, 255, 0.2)' },
     datePickerText: { color: '#FFFFFF', fontSize: 16, marginLeft: 10 },
-    selectProductButton: { backgroundColor: '#673AB7', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', padding: 14, borderRadius: 25, marginBottom: 10 },
-    selectProductButtonText: { color: 'white', fontSize: 16, fontWeight: 'bold', marginLeft: 10 },
+    selectProdutoButton: { backgroundColor: '#673AB7', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', padding: 14, borderRadius: 25, marginBottom: 10 },
+    selectProdutoButtonText: { color: 'white', fontSize: 16, fontWeight: 'bold', marginLeft: 10 },
     orText: { color: 'rgba(255,255,255,0.6)', textAlign: 'center', marginBottom: 20, fontStyle: 'italic' },
     loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
     loadingText: { color: 'white', marginTop: 10 },
     catalogoContainer: { backgroundColor: 'rgba(0, 0, 0, 0.2)', borderRadius: 16, padding: 15, marginBottom: 15, },
     catalogoTitle: { fontSize: 18, fontWeight: 'bold', color: '#FFFFFF', marginBottom: 15, textAlign: 'center', },
-    productListItem: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 15, borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.1)' },
-    productListItemDesc: { color: '#FFFFFF', fontSize: 16 },
-    productListItemValue: { color: '#E0E0E0', fontSize: 14, marginTop: 2 },
-    productStockText: { color: '#FFCC80', fontSize: 14, fontWeight: 'bold', marginLeft: 10, },
-    outOfStockText: { color: '#F44336' },
+    produtoListItem: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 15, borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.1)' },
+    produtoListItemDesc: { color: '#FFFFFF', fontSize: 16 },
+    produtoListItemValue: { color: '#E0E0E0', fontSize: 14, marginTop: 2 },
+    produtoEstoqueText: { color: '#FFCC80', fontSize: 14, fontWeight: 'bold', marginLeft: 10, },
+    fimEstoqueText: { color: '#F44336' },
     catalogoButton: { padding: 14, borderRadius: 12, alignItems: 'center', marginTop: 15 },
     cancelButton: { backgroundColor: '#757575' },
     catalogoButtonText: { color: '#FFFFFF', fontWeight: 'bold', fontSize: 16 },

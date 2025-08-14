@@ -1,6 +1,7 @@
 // app/CadastroInicial.tsx
 import React, { useState } from 'react';
-import { View, Text, TextInput, Alert, StyleSheet, ImageBackground, TouchableOpacity, ActivityIndicator, Platform, KeyboardAvoidingView, ScrollView, SafeAreaView, StatusBar} from "react-native";
+import { View, TextInput, Alert, StyleSheet, ImageBackground, TouchableOpacity, ActivityIndicator, Platform, KeyboardAvoidingView, ScrollView, SafeAreaView, StatusBar} from "react-native";
+import { StyledText as Text } from '../src/components/StyledText';
 import { useRouter } from "expo-router";
 import CryptoJS from "crypto-js";
 import { Usuario } from "../src/types";

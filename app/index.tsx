@@ -1,5 +1,7 @@
 //index.tsx(Tela de Login)
-import { View, Text, TextInput, Alert, StyleSheet, ImageBackground, TouchableOpacity, ActivityIndicator, Platform, KeyboardAvoidingView, ScrollView, SafeAreaView, StatusBar, } from "react-native";
+import { View, TextInput, Alert, StyleSheet, ImageBackground, TouchableOpacity, ActivityIndicator, Platform, KeyboardAvoidingView, ScrollView, SafeAreaView, StatusBar, } from "react-native";
+import { StyledText as Text } from '../src/components/StyledText';
+import { commonStyles } from "../src/theme/commonStyles";
 import React, { useState, useEffect, useRef } from "react";
 import { useRouter } from "expo-router";
 import CryptoJS from "crypto-js";
@@ -149,7 +151,7 @@ export default function TelaLoginScreen() {
                                     disabled={isLoading}
                                 >
                                     <MaterialCommunityIcons name="login-variant" size={22} color="#FFFFFF" />
-                                    <Text style={styles.loginButtonText}>Acessar Sistema</Text>
+                                    <Text style={commonStyles.loginButtonText}>Acessar Sistema</Text>
                                 </TouchableOpacity>
                             )}
                         </View>
@@ -177,14 +179,13 @@ const styles = StyleSheet.create({
     loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', },
     loadingText: { marginTop: 15, color: '#FFFFFF', fontSize: 18, },
     logoContainer: { alignItems: 'center', marginBottom: 40, },
-    appName: { fontSize: 34, fontWeight: 'bold', color: "#FFFFFF", textAlign: "center", marginTop: 10, },
+    appName: { fontSize: 34, color: "#FFFFFF", textAlign: "center", marginTop: 10,fontFamily: 'Roboto-Bold', },
     screenTitle: { fontSize: 18, fontWeight: '300', color: "#E0E0FF", textAlign: "center", marginTop: 4, },
     formContainer: { backgroundColor: 'rgba(255, 255, 255, 0.1)', borderRadius: 16, padding: 25, },
     inputContainer: { flexDirection: 'row', alignItems: 'center', backgroundColor: 'rgba(0, 0, 0, 0.25)', borderRadius: 12, marginBottom: 18, borderWidth: 1, borderColor: 'rgba(255, 255, 255, 0.2)', },
     inputIcon: { paddingHorizontal: 15, },
-    input: { flex: 1, paddingVertical: 14, paddingRight: 15, fontSize: 16, color: '#FFFFFF', },
+    input: { flex: 1, paddingVertical: 14, paddingRight: 15, fontSize: 16, color: '#FFFFFF',fontFamily: 'Roboto-Regular', },
     loginButton: { backgroundColor: 'rgba(76, 175, 80, 0.8)', flexDirection: 'row', paddingVertical: 15, borderRadius: 25, marginTop: 20, alignItems: 'center', justifyContent: 'center', elevation: 3, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.3, shadowRadius: 3, },
-    loginButtonText: { color: "white", fontSize: 17, fontWeight: "bold", marginLeft: 10, },
     loader: { marginTop: 20, paddingVertical: 15, },
     
     versionText: {

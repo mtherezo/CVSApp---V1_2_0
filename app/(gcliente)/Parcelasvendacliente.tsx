@@ -1,6 +1,8 @@
 // Parcelasvendacliente.tsx
 import React, { useEffect, useState, useCallback } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, TextInput, Alert, ImageBackground, ActivityIndicator, RefreshControl, Platform, SafeAreaView, FlatList, StatusBar, KeyboardAvoidingView,} from 'react-native';
+import { View, TouchableOpacity, StyleSheet, TextInput, Alert, ImageBackground, ActivityIndicator, RefreshControl, Platform, SafeAreaView, FlatList, StatusBar, KeyboardAvoidingView,} from 'react-native';
+import { StyledText as Text } from '../../src/components/StyledText';
+import { commonStyles } from '../../src/theme/commonStyles';
 import { useLocalSearchParams, useRouter, useFocusEffect } from 'expo-router';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { listarVendaPorIdSQLite, registrarPagamentoSQLite, excluirPagamentoSQLite, atualizarVendaSQLite,} from '../../src/database/sqlite';
@@ -283,11 +285,11 @@ const styles = StyleSheet.create({
     keyboardAvoidingContainer: { flex: 1 },
     scrollContainer: { flexGrow: 1, paddingHorizontal: 16, paddingBottom: 10 },
     loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-    loadingText: { marginTop: 10, color: '#FFFFFF', fontSize: 16 },
+    loadingText: { marginTop: 10, color: '#FFFFFF', fontSize: 16, fontFamily: 'roboto-regular' },
     headerContainer: { flexDirection: 'row', alignItems: 'center', paddingVertical: 10, paddingHorizontal: 16, marginBottom: 10 },
     backButton: { padding: 8, marginRight: 10, marginLeft: -8 },
-    title: { fontSize: 26, fontWeight: 'bold', color: '#FFFFFF', textAlign: 'center', flex: 1, marginRight: 48 },
-    sectionTitle: { fontSize: 20, fontWeight: '600', marginTop: 10, marginBottom: 15, color: '#FFFFFF', textAlign:'center' },
+    title: { fontSize: 26, fontWeight: 'bold', color: '#FFFFFF', textAlign: 'center', flex: 1, marginRight: 48, fontFamily: 'roboto-regular', },
+    sectionTitle: { fontSize: 20, fontWeight: '600', marginTop: 10, marginBottom: 15, color: '#FFFFFF', textAlign:'center',fontFamily: 'roboto-bold' },
     resumoVendaContainer: {
         backgroundColor: 'rgba(255, 255, 255, 0.1)', 
         padding: 18,
@@ -296,10 +298,10 @@ const styles = StyleSheet.create({
         borderWidth: 1,
         borderColor: 'rgba(255,255,255,0.2)',
     },
-    resumoVendaTexto: { fontSize: 16, color: '#E0E0FF', marginBottom: 6, lineHeight: 22 },
-    saldoDevedor: { fontSize: 18, fontWeight: 'bold' },
-    textoPendente: { color: '#FFAB91' }, 
-    textoQuitado: { color: '#A5D6A7' }, 
+    resumoVendaTexto: { fontSize: 16, color: '#E0E0FF', marginBottom: 6, lineHeight: 22, fontFamily: 'roboto-regular' },
+    saldoDevedor: { fontSize: 18, fontWeight: 'bold', fontFamily: 'roboto-regular' },
+    textoPendente: { color: '#FFAB91', fontFamily: 'roboto-regular' }, 
+    textoQuitado: { color: '#A5D6A7', fontFamily: 'roboto-regular' }, 
     itemPagamento: {
         backgroundColor: 'rgba(255,255,255,0.1)', 
         paddingVertical: 12, 
@@ -313,8 +315,8 @@ const styles = StyleSheet.create({
         borderColor: 'rgba(255,255,255,0.15)',
     },
     itemPagamentoInfo: { flex: 1 },
-    itemValor: { fontSize: 18, fontWeight: 'bold', color: '#FFFFFF' },
-    itemData: { fontSize: 13, color: '#E0E0FF', marginTop: 4, fontStyle: 'italic' },
+    itemValor: { fontSize: 18, fontWeight: 'bold', color: '#FFFFFF',fontFamily: 'roboto-regular' },
+    itemData: { fontSize: 13, color: '#E0E0FF', marginTop: 4, fontStyle: 'italic', fontFamily: 'roboto-regular', },
     botaoExcluirItem: { padding: 8, marginLeft: 10 },
     novoPagamentoContainer: {
         paddingHorizontal: 16,
@@ -334,7 +336,8 @@ const styles = StyleSheet.create({
         flex: 1.5,
         paddingVertical: 14, 
         paddingHorizontal: 15,
-        fontSize: 16, 
+        fontSize: 16,
+        fontFamily: 'roboto-regular',
         color: '#FFFFFF',
         backgroundColor: 'rgba(0, 0, 0, 0.25)', 
         borderRadius: 12, 
@@ -356,6 +359,7 @@ const styles = StyleSheet.create({
         color: '#FFFFFF',
         fontSize: 16,
         marginLeft: 10,
+        fontFamily: 'roboto-regular',
     },
     botaoRegistrar: {
         flexDirection: 'row',
@@ -365,11 +369,12 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         justifyContent: 'center',
     },
-    textoBotaoPrincipal: { color: 'white', fontSize: 17, fontWeight: 'bold', marginLeft: 10 },
+    textoBotaoPrincipal: { color: 'white', fontSize: 17, fontWeight: 'bold', marginLeft: 10,fontFamily: 'roboto-regular', },
     botaoDesabilitado: { opacity: 0.5 },
     listaVaziaTexto: { 
         textAlign: 'center',
         fontSize: 16,
+        fontFamily: 'roboto-regular',
         color: 'rgba(255,255,255,0.6)',
         fontStyle: 'italic',
         paddingVertical: 40, 

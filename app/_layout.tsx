@@ -19,6 +19,9 @@ function MainLayout() {
     'Playwrite': require('../assets/fonts/PlaywriteAUQLD-VariableFont_wght.ttf'),
     'Playwrite-Regular': require('../assets/fonts/PlaywriteAUQLD-Regular.ttf'),
     'Playwrite-Thin': require('../assets/fonts/PlaywriteAUQLD-Thin.ttf'),
+    'Roboto-Regular': require('../assets/fonts/Roboto-Regular.ttf'),
+    'Roboto-Bold': require('../assets/fonts/Roboto-Bold.ttf'),
+    'Roboto-Black': require('../assets/fonts/Roboto-Black.ttf'),
   });
 
   // Efeito para preparar o banco de dados

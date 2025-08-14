@@ -1,6 +1,8 @@
 //Cadastrocliente.tsx
 import React, { useState, useEffect } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, ImageBackground, Alert, ActivityIndicator, ScrollView, KeyboardAvoidingView, Platform, StatusBar, SafeAreaView} from 'react-native';
+import { View, TextInput, TouchableOpacity, StyleSheet, ImageBackground, Alert, ActivityIndicator, ScrollView, KeyboardAvoidingView, Platform, StatusBar, SafeAreaView} from 'react-native';
+import { StyledText as Text } from '../../src/components/StyledText';
+import { commonStyles } from '../../src/theme/commonStyles';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { Cliente } from '../../src/types';
 import * as Crypto from 'expo-crypto'; //expo-crypto para gerar IDs
@@ -94,7 +96,7 @@ export default function CadastroClienteScreen() {
         <View style={styles.overlay} />
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color="#FFFFFF" />
-          <Text style={styles.loadingText}>A carregar dados do cliente...</Text>
+          <Text style={commonStyles.loadingText}>Carregando dados do cliente...</Text>
         </View>
       </ImageBackground>
     );
@@ -117,13 +119,13 @@ export default function CadastroClienteScreen() {
                 <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
                     <MaterialCommunityIcons name="arrow-left" size={24} color="#FFFFFF" />
                 </TouchableOpacity>
-                <Text style={styles.title}>{isEditing ? 'Editar Cliente' : 'Novo Cliente'}</Text>
+                <Text style={commonStyles.title}>{isEditing ? 'Editar Cliente' : 'Novo Cliente'}</Text>
             </View>
             <View style={styles.formContainer}>
                 <View style={styles.inputContainer}>
                     <MaterialCommunityIcons name="account-outline" size={22} color="#A9A9A9" style={styles.inputIcon} />
                     <TextInput
-                        style={styles.input}
+                        style={commonStyles.inputCadcli}
                         placeholder="Nome Completo *"
                         value={nome}
                         onChangeText={setNome}
@@ -134,7 +136,7 @@ export default function CadastroClienteScreen() {
                 <View style={styles.inputContainer}>
                     <MaterialCommunityIcons name="phone-outline" size={22} color="#A9A9A9" style={styles.inputIcon} />
                     <TextInput
-                        style={styles.input}
+                        style={commonStyles.inputCadcli}
                         placeholder="Celular 5591999999999"
                         value={telefone}
                         onChangeText={setTelefone}
@@ -145,7 +147,7 @@ export default function CadastroClienteScreen() {
                 <View style={styles.inputContainer}>
                     <MaterialCommunityIcons name="email-outline" size={22} color="#A9A9A9" style={styles.inputIcon} />
                     <TextInput
-                        style={styles.input}
+                        style={commonStyles.inputCadcli}
                         placeholder="E-mail (opcional)"
                         value={email}
                         onChangeText={setEmail}
@@ -157,7 +159,7 @@ export default function CadastroClienteScreen() {
                 <View style={styles.inputContainer}>
                     <MaterialCommunityIcons name="map-marker-outline" size={22} color="#A9A9A9" style={styles.inputIcon} />
                     <TextInput
-                        style={styles.input}
+                        style={commonStyles.inputCadcli}
                         placeholder="Endereço (opcional)"
                         value={endereco}
                         onChangeText={setEndereco}
@@ -174,7 +176,7 @@ export default function CadastroClienteScreen() {
                     disabled={isSaving}
                 >
                     <MaterialCommunityIcons name={isEditing ? "content-save-edit-outline" : "content-save-outline"} size={22} color="#FFFFFF" />
-                    <Text style={styles.actionButtonText}>{isEditing ? 'Atualizar Cliente' : 'Salvar Cliente'}</Text>
+                    <Text style={commonStyles.actionButtonTextcli}>{isEditing ? 'Atualizar Cliente' : 'Salvar Cliente'}</Text>
                 </TouchableOpacity>
                 )}
             </View>
@@ -209,11 +211,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  loadingText: {
-    marginTop: 10,
-    color: '#FFFFFF',
-    fontSize: 16,
-  },
+  
   headerContainer: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -222,14 +220,7 @@ const styles = StyleSheet.create({
   backButton: {
       padding: 8,
   },
-  title: {
-    fontSize: 26,
-    fontWeight: 'bold',
-    color: '#FFFFFF',
-    textAlign: 'center',
-    flex: 1,
-    marginRight: 40,
-  },
+  
   formContainer: {
     backgroundColor: 'rgba(255, 255, 255, 0.1)',
     borderRadius: 16,
@@ -247,13 +238,8 @@ const styles = StyleSheet.create({
   inputIcon: {
       paddingHorizontal: 15,
   },
-  input: {
-    flex: 1,
-    paddingVertical: 14, 
-    paddingRight: 15,
-    fontSize: 16, 
-    color: '#FFFFFF', 
-  },
+   
+
   actionButton: {
     backgroundColor: '#4CAF50',
     flexDirection: 'row',
@@ -268,12 +254,7 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.3,
     shadowRadius: 3,
   },
-  actionButtonText: {
-    color: 'white',
-    fontSize: 17, 
-    fontWeight: 'bold',
-    marginLeft: 10,
-  },
+  
   loader: { 
     marginTop: 20,
     paddingVertical: 15,

@@ -1,6 +1,7 @@
 //Gerarrelatorios.tsx
 import React, { useState } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Alert, ActivityIndicator, ScrollView, ImageBackground, SafeAreaView, Platform, StatusBar } from 'react-native';
+import { View, TouchableOpacity, StyleSheet, Alert, ActivityIndicator, ScrollView, ImageBackground, SafeAreaView, Platform, StatusBar } from 'react-native';
+import { StyledText as Text } from '../../src/components/StyledText';
 import { useRouter } from 'expo-router';
 import * as Print from 'expo-print';
 import * as Sharing from 'expo-sharing';
@@ -301,7 +302,7 @@ const styles = StyleSheet.create({
     },
     title: {
         fontSize: 26,
-        fontWeight: 'bold',
+        fontFamily: 'Roboto-Bold',
         color: '#FFFFFF',
         textAlign: 'center',
         flex: 1,

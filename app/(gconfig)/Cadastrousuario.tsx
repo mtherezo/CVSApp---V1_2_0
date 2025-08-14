@@ -1,10 +1,11 @@
 // Cadastrousuario.tsx
 import React, { useState, useCallback } from 'react';
 import {
-    View, Text, FlatList, StyleSheet, TouchableOpacity, Alert, ImageBackground,
+    View, FlatList, StyleSheet, TouchableOpacity, Alert, ImageBackground,
     ActivityIndicator, RefreshControl, Platform, SafeAreaView, StatusBar,
     TextInput, ScrollView
 } from 'react-native';
+import { StyledText as Text } from '../../src/components/StyledText';
 import { Usuario } from '../../src/types';
 import { useRouter, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { 
@@ -328,12 +329,12 @@ const styles = StyleSheet.create({
     loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
     headerContainer: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 10, paddingVertical: 10 },
     backButton: { padding: 8 },
-    title: { fontSize: 26, fontWeight: 'bold', color: '#FFFFFF', textAlign: 'center', flex: 1, marginRight: 40 },
+    title: { fontSize: 26, fontFamily: 'Roboto-Bold', color: '#FFFFFF', textAlign: 'center', flex: 1, marginRight: 40 },
     buscaContainer: { paddingHorizontal: 16, paddingBottom: 10 },
     emptyContainer: { alignItems: 'center', marginTop: '40%' },
-    emptyText: { fontSize: 18, color: 'rgba(255,255,255,0.7)' },
+    emptyText: { fontSize: 18, fontFamily: 'Roboto-Regular', color: 'rgba(255,255,255,0.7)' },
     card: { backgroundColor: 'rgba(255, 255, 255, 0.1)', borderRadius: 12, padding: 15, marginBottom: 12, flexDirection: 'row', alignItems: 'center' },
-    cardTitle: { flex: 1, fontSize: 18, fontWeight: 'bold', color: '#FFFFFF', marginLeft: 15 },
+    cardTitle: { flex: 1, fontSize: 18, fontFamily: 'Roboto-Bold', color: '#FFFFFF', marginLeft: 15 },
     cardActions: { flexDirection: 'row' },
     actionButton: { padding: 8, marginLeft: 10 },
     footer: {
@@ -344,17 +345,17 @@ const styles = StyleSheet.create({
         backgroundColor: 'rgba(25, 10, 50, 0.85)'
     },
     addButton: { backgroundColor: '#4CAF50', flexDirection: 'row', paddingVertical: 15, borderRadius: 25, alignItems: 'center', justifyContent: 'center' },
-    addButtonText: { color: 'white', fontSize: 17, fontWeight: 'bold', marginLeft: 10 },
+    addButtonText: { color: 'white', fontSize: 17, fontFamily: 'Roboto-Bold', marginLeft: 10 },
     formScrollContainer: {
         padding: 20,
     },
-    formTitle: { fontSize: 22, fontWeight: 'bold', color: '#FFFFFF', marginBottom: 20, textAlign: 'center' },
-    input: { backgroundColor: 'rgba(0,0,0,0.25)', borderRadius: 12, padding: 15, fontSize: 16, color: '#FFFFFF', marginBottom: 15 },
+    formTitle: { fontSize: 22, fontFamily: 'Roboto-Bold', color: '#FFFFFF', marginBottom: 20, textAlign: 'center' },
+    input: { backgroundColor: 'rgba(0,0,0,0.25)', borderRadius: 12, padding: 15, fontSize: 16, fontFamily: 'Roboto-Regular', color: '#FFFFFF', marginBottom: 15 },
     disabledInput: { backgroundColor: 'rgba(0,0,0,0.15)', color: '#999' },
     formActions: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 10 },
     formButton: { flex: 1, padding: 15, borderRadius: 12, alignItems: 'center' },
     cancelButton: { backgroundColor: '#555', marginRight: 10 },
     saveButton: { backgroundColor: '#4CAF50' },
     disabledButton: { opacity: 0.6 },
-    formButtonText: { color: '#FFFFFF', fontWeight: 'bold', fontSize: 16 },
+    formButtonText: { color: '#FFFFFF', fontSize: 16, fontFamily: 'Roboto-Bold', },
 });

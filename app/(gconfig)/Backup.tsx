@@ -1,6 +1,8 @@
 // app/Backup.tsx
 import React, { useState } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Alert, ActivityIndicator, Platform, SafeAreaView, StatusBar, ScrollView, ImageBackground } from 'react-native';
+import { View, TouchableOpacity, StyleSheet, Alert, ActivityIndicator, Platform, SafeAreaView, StatusBar, ScrollView, ImageBackground } from 'react-native';
+import { StyledText as Text } from '../../src/components/StyledText';
+import { commonStyles } from '../../src/theme/commonStyles';
 import { useRouter } from 'expo-router';
 import * as FileSystem from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
@@ -228,7 +230,7 @@ const styles = StyleSheet.create({
     backButton: { padding: 8 },
     title: { 
         fontSize: 22, 
-        fontWeight: 'bold', 
+        fontFamily: 'Roboto-Bold',
         color: '#FFFFFF',
         flex: 1,
         textAlign: 'center',
@@ -246,13 +248,14 @@ const styles = StyleSheet.create({
     },
     cardTitle: {
         fontSize: 20,
-        fontWeight: 'bold',
+        fontFamily: 'Roboto-Bold',
         color: '#FFFFFF',
         marginTop: 10,
         marginBottom: 10,
     },
     cardDescription: {
         fontSize: 15,
+        fontFamily: 'Roboto-Regular',
         textAlign: 'center',
         color: '#E0E0FF',
         marginBottom: 20,
@@ -270,7 +273,8 @@ const styles = StyleSheet.create({
     buttonText: {
         color: '#FFFFFF',
         fontSize: 16,
-        fontWeight: 'bold',
+        fontFamily: 'Roboto-Bold',
+        
     },
     loadingOverlay: {
         ...StyleSheet.absoluteFillObject,
@@ -281,6 +285,7 @@ const styles = StyleSheet.create({
     statusText: {
         marginTop: 15,
         fontSize: 16,
+        fontFamily: 'Roboto-Regular',
         fontWeight: '600',
         color: '#FFFFFF'
     }

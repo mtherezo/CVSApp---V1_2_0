@@ -31,7 +31,7 @@ export interface Venda {
   clienteTelefone?: string | null; //  Permite que seja nulo, como no banco.
   itens: ItemVenda[];
   dataVenda: string;
-  dataPagamento: string;
+  //dataPagamento: string;
   subtotal: number;
   valorTotal: number;
   tipoPagamento: 'À Vista' | 'Parcelado';

@@ -1,6 +1,7 @@
 // EnviarLembreteWhatsAppButton.tsx
 import React from 'react';
-import { TouchableOpacity, Text, Linking, Alert, StyleSheet, StyleProp, ViewStyle } from 'react-native';
+import { TouchableOpacity, Linking, Alert, StyleSheet, StyleProp, ViewStyle } from 'react-native';
+import { StyledText as Text } from '../../src/components/StyledText';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 
 interface LembreteWhatsAppProps {
@@ -117,7 +118,7 @@ const styles = StyleSheet.create({
   textoBotaoLembrete: {
     color: 'white',
     fontSize: 13, 
-    fontWeight: 'bold',
+    fontFamily: 'Roboto-Bold',
     marginLeft: 8,
   },
 });
