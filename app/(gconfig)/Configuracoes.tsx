@@ -1,21 +1,36 @@
 // app/Configuracoes.tsx
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { View, TouchableOpacity, StyleSheet, ImageBackground, SafeAreaView, StatusBar, Platform, ScrollView, Alert } from 'react-native';
 import { StyledText as Text } from '../../src/components/StyledText';
 import { useRouter, useLocalSearchParams, Href } from 'expo-router';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import * as Linking from 'expo-linking';
 import Constants from 'expo-constants';
+import { buscarUsuarioPorUsernameSQLite } from '../../src/database/sqlite';
 
 type IconName = React.ComponentProps<typeof MaterialCommunityIcons>['name'];
-const ADMIN_USERNAME = "stherezo";
+//const ADMIN_USERNAME = "stherezo";
 
 export default function ConfiguracoesScreen() {
     const router = useRouter();
     const appVersion = Constants.expoConfig?.version;
     const { username: rawUsername } = useLocalSearchParams() as { username?: string | string[] };
     const loggedInUsername = (Array.isArray(rawUsername) ? rawUsername[0] : rawUsername)?.toLowerCase();
-    const isAdmin = loggedInUsername === ADMIN_USERNAME.toLowerCase();
+    const [isAdmin, setIsAdmin] = useState(false);
+
+    // Busca os dados do utilizador para verificar se é admin
+    useEffect(() => {
+        const verificarAdmin = async () => {
+            if (loggedInUsername) {
+                const utilizador = await buscarUsuarioPorUsernameSQLite(loggedInUsername);
+                if (utilizador?.isAdmin === 1) {
+                    setIsAdmin(true);
+                }
+            }
+        };
+        verificarAdmin();
+    }, [loggedInUsername]);
+    
 
     //função para abrir o e-mail
     const handleFaleConosco = () => {
@@ -71,7 +86,6 @@ export default function ConfiguracoesScreen() {
                         }
                         return null;
                     })}
-                    
                 </ScrollView>
             </SafeAreaView>
         </ImageBackground>

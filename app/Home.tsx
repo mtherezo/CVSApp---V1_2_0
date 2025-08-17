@@ -1,14 +1,14 @@
-// Home.tsx
-import { useLocalSearchParams, useRouter, Href } from "expo-router";
-import { ImageBackground, View,  TouchableOpacity, StyleSheet, Platform, SafeAreaView, ScrollView, Alert, StatusBar} from "react-native";
+// Home.tsx 
+import { useLocalSearchParams, useRouter } from "expo-router";
+import { ImageBackground, View, TouchableOpacity, StyleSheet, Platform, SafeAreaView, ScrollView, StatusBar, Modal } from "react-native";
 import { StyledText as Text } from '../src/components/StyledText';
-import React from 'react';
+import React, { useState } from 'react';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import Constants from 'expo-constants';
+import { MotiView } from "moti"; // animação
 
 type IconName = React.ComponentProps<typeof MaterialCommunityIcons>['name'];
 
-// ESTRUTURA DE DADOS com "as const" no final
 const navButtons = [
     { title: 'Gerenciar Clientes', icon: 'account-group-outline', pathname: '/Clientes', color: '#81D4FA' },
     { title: 'Catálogo de Produtos', icon: 'package-variant-closed', pathname: '/Produtos', color: '#81D4FA' },
@@ -16,14 +16,14 @@ const navButtons = [
     { title: 'Histórico de Vendas', icon: 'history', pathname: '/Todasvendas', color: '#A5D6A7' },
     { title: 'Relatórios de Vendas', icon: 'file-chart-outline', pathname: '/Gerarrelatorios', color: '#A5D6A7' },
     { title: 'Configurações', icon: 'cog-outline', pathname: '/Configuracoes', color: '#BDBDBD' },
-] as const; // O "as const" garante a tipagem correta para as rotas
+] as const;
 
-const ADMIN_USERNAME = "stherezo";
-
-export default function home() {
+export default function Home() {
     const appVersion = Constants.expoConfig?.version;
     const { username: rawUsername } = useLocalSearchParams() as { username?: string | string[] };
     const router = useRouter();
+
+    const [modalVisible, setModalVisible] = useState(false);
 
     function capitalize(text: string | string[] | undefined): string {
         if (!text) return "Consultora";
@@ -35,17 +35,13 @@ export default function home() {
     const displayName = capitalize(rawUsername);
     const loggedInUsername = (Array.isArray(rawUsername) ? rawUsername[0] : rawUsername)?.toLowerCase();
 
-    
-    
     const handleLogout = () => {
-        Alert.alert(
-            "Sair",
-            "Tem certeza que deseja sair do aplicativo?",
-            [
-                { text: "Cancelar", style: "cancel" },
-                { text: "Sair", style: "destructive", onPress: () => router.replace("./") }
-            ]
-        );
+        setModalVisible(true);
+    };
+
+    const confirmarLogout = () => {
+        setModalVisible(false);
+        router.replace("./");
     };
 
     return (
@@ -67,7 +63,6 @@ export default function home() {
                             <TouchableOpacity 
                                 key={button.title} 
                                 style={styles.gridButton} 
-                                // CHAMADA DIRETA E SEGURA para o router.push
                                 onPress={() => router.push({
                                     pathname: button.pathname,
                                     params: { username: loggedInUsername }
@@ -79,6 +74,7 @@ export default function home() {
                         ))}
                     </View>
 
+                    {/* Botão de sair */}
                     <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
                         <MaterialCommunityIcons name="logout" size={20} color="#FFDDC5" />
                         <Text style={styles.logoutButtonText}>Sair</Text>
@@ -91,19 +87,58 @@ export default function home() {
                     )}
                 </ScrollView>
             </SafeAreaView>
+
+            {/* Modal customizado com animação */}
+            <Modal
+                transparent={true}
+                visible={modalVisible}
+                animationType="none" // desabilita a animação nativa
+                onRequestClose={() => setModalVisible(false)}
+            >
+                <View style={styles.modalOverlay}>
+                    <MotiView
+                        from={{ opacity: 0, scale: 0.8 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        exit={{ opacity: 0, scale: 0.8 }}
+                        transition={{ type: "timing", duration: 300 }}
+                        style={styles.modalContainer}
+                    >
+                        <Text style={styles.modalTitulo}>Sair</Text>
+                        <Text style={styles.modalMensagem}>
+                            Tem certeza que deseja sair do aplicativo?
+                        </Text>
+
+                        <View style={styles.botoesContainer}>
+                            <TouchableOpacity
+                                style={[styles.botao, styles.cancelar]}
+                                onPress={() => setModalVisible(false)}
+                            >
+                                <Text style={styles.botaoTexto}>Cancelar</Text>
+                            </TouchableOpacity>
+
+                            <TouchableOpacity
+                                style={[styles.botao, styles.sair]}
+                                onPress={confirmarLogout}
+                            >
+                                <Text style={styles.botaoTexto}>Sair</Text>
+                            </TouchableOpacity>
+                        </View>
+                    </MotiView>
+                </View>
+            </Modal>
         </ImageBackground>
     );
 }
 
 const styles = StyleSheet.create({
-    background: { flex: 1, },
-    overlay: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(25, 10, 50, 0.65)', },
-    safeArea: { flex: 1, paddingTop: Platform.OS === 'android' ? StatusBar.currentHeight : 0, },
-    scrollContainer: { flexGrow: 1, paddingHorizontal: 20, paddingVertical: 30, },
-    headerContainer: { alignItems: 'center', marginBottom: 30, },
-    title: { fontSize: 24, fontWeight: '300', color: "#E0E0FF", textAlign: "center", },
-    usernameText: { fontSize: 32,  color: "#FFFFFF", textAlign: "center",fontFamily: 'Roboto-Bold' },
-    buttonGrid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', },
+    background: { flex: 1 },
+    overlay: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(25, 10, 50, 0.65)' },
+    safeArea: { flex: 1, paddingTop: Platform.OS === 'android' ? StatusBar.currentHeight : 0 },
+    scrollContainer: { flexGrow: 1, paddingHorizontal: 20, paddingVertical: 30 },
+    headerContainer: { alignItems: 'center', marginBottom: 30 },
+    title: { fontSize: 24, fontFamily: 'Roboto-Bold', color: "#E0E0FF", textAlign: "center" },
+    usernameText: { fontSize: 32,  color: "#FFFFFF", textAlign: "center", fontFamily: 'Roboto-Bold' },
+    buttonGrid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between' },
     gridButton: {
         backgroundColor: 'rgba(255, 255, 255, 0.1)',
         borderRadius: 16,
@@ -120,7 +155,7 @@ const styles = StyleSheet.create({
         textAlign: "center",
         color: 'white',
         fontSize: 14,
-        fontWeight: '600',
+        fontFamily: 'Roboto-Bold',
         marginTop: 12,
     },
     logoutButton: {
@@ -145,7 +180,62 @@ const styles = StyleSheet.create({
         textAlign: 'center',
         color: 'rgba(255, 255, 255, 0.4)',
         fontSize: 12,
+        fontFamily: 'Roboto-Regular',
         marginTop: 20,
         paddingBottom: 10,
+    },
+
+    // Estilos do Modal
+    modalOverlay: {
+        flex: 1,
+        backgroundColor: "rgba(0,0,0,0.6)",
+        justifyContent: "center",
+        alignItems: "center",
+    },
+    modalContainer: {
+        width: "80%",
+        backgroundColor: "#494747f1",
+        borderRadius: 20,
+        padding: 20,
+        alignItems: "center",
+    },
+    modalTitulo: {
+        fontSize: 20,
+        color: "#fff",
+        marginBottom: 10,
+        fontFamily: "Roboto-Bold",
+    },
+    modalMensagem: {
+        fontSize: 16,
+        color: "#ccc",
+        textAlign: "center",
+        marginBottom: 20,
+        fontFamily: "Roboto-Regular",
+    },
+    botoesContainer: {
+        flexDirection: "row",
+        justifyContent: "space-between",
+        width: "100%",
+    },
+    botao: {
+        flex: 1,
+        paddingVertical: 12,
+        marginHorizontal: 5,
+        borderRadius: 25,
+        alignItems: "center",
+        borderWidth: 1,
+    },
+    cancelar: {
+        backgroundColor: "rgba(255,255,255,0.1)",
+        borderColor: "rgba(255,255,255,0.3)",
+    },
+    sair: {
+        backgroundColor: "rgba(255, 120, 100, 0.3)",
+        borderColor: "rgba(255,150,130,0.6)",
+    },
+    botaoTexto: {
+        color: "#fff",
+        fontSize: 16,
+        fontFamily: "Roboto-Bold",
     },
 });

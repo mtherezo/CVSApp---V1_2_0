@@ -205,6 +205,7 @@ export default function VendasClienteScreen() {
                             totalParcelas={item.parcelasTotais}
                             subtotal={item.subtotal}
                             desconto={item.desconto}
+                            itensVenda={item.itens}
                         />
                     )}
                     

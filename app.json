@@ -2,7 +2,7 @@
   "expo": {
     "name": "CVSApp",
     "slug": "CVSApp",
-    "version": "3.1.2",
+    "version": "3.2.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "cvsapp",
@@ -21,7 +21,7 @@
         "backgroundColor": "#ffffff"
       },
       "package": "com.seunome.cvsapp",
-      "versionCode": 11,
+      "versionCode": 12,
       "androidNavigationBar": {
         "backgroundColor": "#190a32",
         "barStyle": "light-content"

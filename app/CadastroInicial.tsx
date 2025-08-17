@@ -7,6 +7,8 @@ import CryptoJS from "crypto-js";
 import { Usuario } from "../src/types";
 import { adicionarOuAtualizarUsuarioSQLite } from '../src/database/sqlite';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
+import CustomAlert from '../src/components/CustomAlert';
+import { MotiView } from 'moti';
 
 export default function CadastroInicialScreen() {
     const [username, setUsername] = useState("");
@@ -15,19 +17,35 @@ export default function CadastroInicialScreen() {
     const [isLoading, setIsLoading] = useState(false);
     const router = useRouter();
 
+    //  Estados para o CustomAlert
+    const [alertVisible, setAlertVisible] = useState(false);
+    const [alertInfo, setAlertInfo] = useState({
+        title: '',
+        message: '',
+        onConfirm: undefined as (() => void) | undefined,
+        confirmText: 'Ok'
+    });
+
+    // Função auxiliar para mostrar o alerta
+    const showAlert = (title: string, message: string, onConfirm?: () => void, confirmText = 'Ok') => {
+        setAlertInfo({ title, message, onConfirm, confirmText });
+        setAlertVisible(true);
+    };
+
     const handleSalvar = async () => {
         if (!username.trim() || !password || !confirmPassword) {
-            Alert.alert("Atenção", "Por favor, preencha todos os campos.");
+            showAlert("Atenção", "Por favor, preencha todos os campos.");
             return;
         }
         if (password.length < 6) {
-            Alert.alert("Senha Fraca", "A senha deve ter pelo menos 6 caracteres.");
+            showAlert("Senha Fraca", "A senha deve ter pelo menos 6 caracteres.");
             return;
         }
         if (password !== confirmPassword) {
-            Alert.alert("Erro", "As senhas não coincidem. Tente novamente.");
+            showAlert("Erro", "As senhas não coincidem. Tente novamente.");
             return;
         }
+
 
         setIsLoading(true);
         try {
@@ -35,15 +53,16 @@ export default function CadastroInicialScreen() {
             const novoUsuario: Usuario = {
                 username: username.trim(),
                 passwordHash,
+                isAdmin: 1,
             };
             
             // CHAMADA DA FUNÇÃO
             await adicionarOuAtualizarUsuarioSQLite(novoUsuario);
 
-            Alert.alert(
-                "Conta Criada com Sucesso!",
-                "Seu usuário foi criado. Agora você será redirecionado para a tela de login.",
-                [{ text: "OK", onPress: () => router.replace('/') }] // Usa replace para não poder voltar
+            showAlert(
+                "Conta de Administrador Criada!",
+                "Você foi definido como o administrador do sistema. Agora será redirecionado para a tela de login.",
+                () => router.replace('/')
             );
 
         } catch (error) {
@@ -124,6 +143,16 @@ export default function CadastroInicialScreen() {
                     </ScrollView>
                 </KeyboardAvoidingView>
             </SafeAreaView>
+
+            {/* Renderiza o CustomAlert aqui */}
+            <CustomAlert
+                visible={alertVisible}
+                title={alertInfo.title}
+                message={alertInfo.message}
+                onClose={() => setAlertVisible(false)}
+                onConfirm={alertInfo.onConfirm}
+                confirmText={alertInfo.confirmText}
+            />
         </ImageBackground>
     );
 }
@@ -135,13 +164,13 @@ const styles = StyleSheet.create({
     keyboardAvoidingContainer: { flex: 1, },
     scrollContainer: { flexGrow: 1, justifyContent: "center", padding: 20, },
     logoContainer: { alignItems: 'center', marginBottom: 40, },
-    appName: { fontSize: 34, fontWeight: 'bold', color: "#FFFFFF", textAlign: "center", marginTop: 10, },
-    screenTitle: { fontSize: 18, fontWeight: '300', color: "#E0E0FF", textAlign: "center", marginTop: 4, },
+    appName: { fontSize: 34, fontFamily: 'Roboto-Bold', color: "#FFFFFF", textAlign: "center", marginTop: 10, },
+    screenTitle: { fontSize: 18, fontFamily: 'Roboto-Regular', color: "#E0E0FF", textAlign: "center", marginTop: 4, },
     formContainer: { backgroundColor: 'rgba(255, 255, 255, 0.1)', borderRadius: 16, padding: 25, },
     inputContainer: { flexDirection: 'row', alignItems: 'center', backgroundColor: 'rgba(0, 0, 0, 0.25)', borderRadius: 12, marginBottom: 18, borderWidth: 1, borderColor: 'rgba(255, 255, 255, 0.2)', },
     inputIcon: { paddingHorizontal: 15, },
-    input: { flex: 1, paddingVertical: 14, paddingRight: 15, fontSize: 16, color: '#FFFFFF', },
+    input: { flex: 1, paddingVertical: 14, paddingRight: 15, fontSize: 16, fontFamily: 'Roboto-Regular', color: '#FFFFFF', },
     loginButton: { backgroundColor: 'rgba(76, 175, 80, 0.8)', flexDirection: 'row', paddingVertical: 15, borderRadius: 25, marginTop: 20, alignItems: 'center', justifyContent: 'center', },
-    loginButtonText: { color: "white", fontSize: 17, fontWeight: "bold", marginLeft: 10, },
+    loginButtonText: { color: "white", fontSize: 17, fontFamily: 'Roboto-Bold', marginLeft: 10, },
     loader: { marginTop: 20, paddingVertical: 15, },
 });

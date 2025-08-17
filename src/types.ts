@@ -1,11 +1,13 @@
+// src/types.ts
 export interface ItemVenda {
   id: string;
-  idVenda?: string;
+  idVenda: string;
   idProduto?: string;
   descricao: string;
-  valor: number;
   quantidade: number;
-  
+  valor: number;
+  fotoUri?: string;
+  marca?: string;
 }
 
 export interface Cliente {
@@ -47,6 +49,7 @@ export interface Venda {
 export interface Usuario {
   username: string;
   passwordHash: string;
+  isAdmin?: number;
   
 }
 

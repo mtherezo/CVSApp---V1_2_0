@@ -21,7 +21,7 @@ export function StyledText(props: TextProps) {
 
 const styles = StyleSheet.create({
   default: {
-    // ✨ Define 'Roboto-Regular' como a fonte padrão para TODO o texto no app.
+    // Define 'Roboto-Regular' como a fonte padrão para TODO o texto no app.
     fontFamily: 'Roboto-Regular',
   },
 });

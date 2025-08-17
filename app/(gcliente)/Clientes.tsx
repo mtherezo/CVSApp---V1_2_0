@@ -1,6 +1,6 @@
-//Clientes.tsx
+// (gcliente) Clientes.tsx
 import React, { useState, useCallback, useEffect } from 'react';
-import { View, FlatList, StyleSheet, TouchableOpacity, Alert, ImageBackground, ActivityIndicator, RefreshControl, Platform, SafeAreaView, StatusBar,} from 'react-native';
+import { View, FlatList, StyleSheet, TouchableOpacity, ImageBackground, ActivityIndicator, RefreshControl, Platform, SafeAreaView, StatusBar,} from 'react-native';
 import { StyledText as Text } from '../../src/components/StyledText';
 import { Cliente } from '../../src/types';
 import { useRouter, useFocusEffect } from 'expo-router';
@@ -8,6 +8,7 @@ import { listarClientesSQLite, excluirClienteSQLite } from '../../src/database/s
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAppContext } from '../../src/contexts/AppContext';
+import CustomAlert from '../../src/components/CustomAlert';
 
 export default function ClientesScreen() {
     const [clientes, setClientes] = useState<Cliente[]>([]);
@@ -17,7 +18,22 @@ export default function ClientesScreen() {
     const [refreshing, setRefreshing] = useState(false);
     const router = useRouter();
     const insets = useSafeAreaInsets();
-    const { isDbReady } = useAppContext(); // Obtém o status de prontidão do banco de dados
+    const { isDbReady } = useAppContext();
+
+    // Estados para controlar o CustomAlert
+    const [alertVisible, setAlertVisible] = useState(false);
+    const [alertInfo, setAlertInfo] = useState({
+        title: '',
+        message: '',
+        onConfirm: undefined as (() => void) | undefined,
+        confirmText: 'Ok'
+    });
+
+    //  Função auxiliar para mostrar o alerta
+    const showAlert = (title: string, message: string, onConfirm?: () => void, confirmText = 'Ok') => {
+        setAlertInfo({ title, message, onConfirm, confirmText });
+        setAlertVisible(true);
+    };
 
     const carregarClientesComLoading = async (showLoader = true) => {
         if (showLoader) setIsLoading(true);
@@ -26,7 +42,7 @@ export default function ClientesScreen() {
             setClientes(dados);
         } catch (error) {
             console.error('Falha ao carregar clientes (catch na tela):', error);
-            Alert.alert('Erro', 'Não foi possível carregar a lista de clientes.');
+            showAlert('Erro', 'Não foi possível carregar a lista de clientes.');
         } finally {
             if (showLoader) setIsLoading(false);
         }
@@ -40,45 +56,38 @@ export default function ClientesScreen() {
 
     useFocusEffect(
         useCallback(() => {
-            // CONDIÇÃO DE SEGURANÇA ADICIONADA
-            // Só tenta carregar os clientes DEPOIS que o banco de dados estiver 100% pronto.
             if (isDbReady) {
                 carregarClientesComLoading();
                 setClienteSelecionado(null);
             }
-        }, [isDbReady]) // Roda sempre que o status do DB mudar (e quando a tela focar)
+        }, [isDbReady])
     );
 
     const handleExcluirCliente = async () => {
         if (!clienteSelecionado) {
-            Alert.alert("Atenção", "Nenhum cliente selecionado para excluir.");
+            showAlert("Atenção", "Nenhum cliente selecionado para excluir.");
             return;
         }
 
-        Alert.alert(
+        // Lógica de exclusão agora usa o CustomAlert
+        showAlert(
             'Confirmar Exclusão',
-            `Tem certeza que deseja excluir o cliente "${clienteSelecionado.nome}"? Todas as vendas associadas também serão excluídas. Esta ação não pode ser desfeita.`,
-            [
-                { text: 'Cancelar', style: 'cancel', onPress: () => setClienteSelecionado(null) },
-                {
-                    text: 'Excluir Definitivamente',
-                    style: 'destructive',
-                    onPress: async () => {
-                        setIsDeleting(true);
-                        try {
-                            await excluirClienteSQLite(clienteSelecionado.id);
-                            Alert.alert('Sucesso', `Cliente "${clienteSelecionado.nome}" e suas vendas foram excluídos.`);
-                            setClienteSelecionado(null);
-                            await carregarClientesComLoading(false);
-                        } catch (error) {
-                            console.error('Falha ao excluir cliente:', error);
-                            Alert.alert('Erro Inesperado', 'Ocorreu um erro ao tentar excluir o cliente.');
-                        } finally {
-                            setIsDeleting(false);
-                        }
-                    }
+            `Tem certeza que deseja excluir o cliente "${clienteSelecionado.nome}"? Todas as vendas associadas também serão excluídas.`,
+            async () => {
+                setIsDeleting(true);
+                setAlertVisible(false); // Fecha o alerta para mostrar o loading
+                try {
+                    await excluirClienteSQLite(clienteSelecionado.id);
+                    setClienteSelecionado(null);
+                    await carregarClientesComLoading(false);
+                } catch (error) {
+                    console.error('Falha ao excluir cliente:', error);
+                    showAlert('Erro Inesperado', 'Ocorreu um erro ao tentar excluir o cliente.');
+                } finally {
+                    setIsDeleting(false);
                 }
-            ]
+            },
+            'Excluir'
         );
     };
 
@@ -107,7 +116,6 @@ export default function ClientesScreen() {
         </TouchableOpacity>
     );
 
-    // ✨ Ecrã de carregamento de segurança
     if (!isDbReady || (isLoading && !refreshing)) {
         return (
             <ImageBackground source={require("../../assets/images/fundo.jpg")} style={styles.background} blurRadius={2}>
@@ -189,6 +197,16 @@ export default function ClientesScreen() {
                     </TouchableOpacity>
                 </View>
             </SafeAreaView>
+
+            {/*  Renderiza o CustomAlert aqui */}
+            <CustomAlert
+                visible={alertVisible}
+                title={alertInfo.title}
+                message={alertInfo.message}
+                onClose={() => setAlertVisible(false)}
+                onConfirm={alertInfo.onConfirm}
+                confirmText={alertInfo.confirmText}
+            />
         </ImageBackground>
     );
 }

@@ -9,6 +9,7 @@ import * as Crypto from 'expo-crypto';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as ImagePicker from 'expo-image-picker';
 import { commonStyles } from '../../src/theme/commonStyles';
+import CustomAlert from '../../src/components/CustomAlert'; // Importa o CustomAlert
 
 // Define os tipos de filtro de Estoque
 type FiltroEstoqueStatus = 'todos' | 'emEstoque' | 'semEstoque';
@@ -153,19 +154,28 @@ export default function ProdutosScreen() {
     const [mostrarFormulario, setMostrarFormulario] = useState(false);
     const [produtoEditando, setProdutoEditando] = useState<Produto | null>(null);
     const [isSaving, setIsSaving] = useState(false);
-    
-    // Novos estados para a busca e o filtro
     const [termoBusca, setTermoBusca] = useState('');
     const [filtroEstoque, setFiltroEstoque] = useState<FiltroEstoqueStatus>('todos');
-
     const router = useRouter();
+
+    //  Estados para o CustomAlert
+    const [alertVisible, setAlertVisible] = useState(false);
+    const [alertInfo, setAlertInfo] = useState({ title: '', message: '', onConfirm: undefined as (() => void) | undefined, confirmText: 'Ok' });
+
+    const showAlert = (title: string, message: string, onConfirm?: () => void, confirmText = 'Ok') => {
+        setAlertInfo({ title, message, onConfirm, confirmText });
+        setAlertVisible(true);
+    };
 
     const carregarProdutos = async (showLoader = true) => {
         if (showLoader) setIsLoading(true);
         try {
             const dados = await listarProdutosSQLite();
             setProdutos(dados);
-        } catch (error) { console.error('Falha ao carregar produtos:', error); Alert.alert('Erro', 'Não foi possível carregar o catálogo de produtos.'); } finally {
+        } catch (error) { 
+            console.error('Falha ao carregar produtos:', error); 
+            showAlert('Erro', 'Não foi possível carregar o catálogo de produtos.');
+        } finally {
             if (showLoader) setIsLoading(false);
         }
     };
@@ -189,9 +199,9 @@ export default function ProdutosScreen() {
             handleFecharFormulario();
         } catch (error: any) {
             if (error instanceof Error && error.message.includes('UNIQUE constraint failed: produtos.descricao')) {
-                Alert.alert('Erro', 'Já existe um produto com esta descrição.');
+                showAlert('Erro', 'Já existe um produto com esta descrição.');
             } else {
-                Alert.alert('Erro ao salvar', error.message || 'Não foi possível salvar o produto.');
+                showAlert('Erro ao salvar', error.message || 'Não foi possível salvar o produto.');
             }
         } finally {
             setIsSaving(false);
@@ -199,24 +209,26 @@ export default function ProdutosScreen() {
     };
 
     const handleConfirmarExclusao = (produto: Produto) => {
-        Alert.alert('Confirmar Exclusão', `Tem certeza que deseja excluir o produto "${produto.descricao}"?`,
-            [{ text: 'Cancelar', style: 'cancel' }, { text: 'Excluir', style: 'destructive',
-                onPress: async () => { await excluirProdutoSQLite(produto.id); await carregarProdutos(false); }
-            }]
+        showAlert(
+            'Confirmar Exclusão',
+            `Tem certeza que deseja excluir o produto "${produto.descricao}"?`,
+            async () => {
+                await excluirProdutoSQLite(produto.id);
+                await carregarProdutos(false);
+                setAlertVisible(false);
+            },
+            'Excluir'
         );
     };
 
-    // Lógica para filtrar os produtos com base na busca e no filtro de Estoque
     const produtosFiltrados = useMemo(() => {
         return produtos
             .filter(produto => {
-                // Filtro de Estoque
                 if (filtroEstoque === 'emEstoque') return (produto.quantidadeEstoque || 0) > 0;
                 if (filtroEstoque === 'semEstoque') return (produto.quantidadeEstoque || 0) === 0;
-                return true; // para 'todos'
+                return true;
             })
             .filter(produto => {
-                // Filtro de Busca por texto
                 const termo = termoBusca.toLowerCase();
                 if (!termo) return true;
                 return (
@@ -275,7 +287,6 @@ export default function ProdutosScreen() {
                                 ><Text style={styles.filtroTexto}>Sem Estoque</Text></TouchableOpacity>
                             </View>
                         </View>
-
                         <ListaProdutosView
                             produtos={produtosFiltrados}
                             onRefresh={onRefresh}
@@ -287,6 +298,15 @@ export default function ProdutosScreen() {
                     </>
                 )}
             </SafeAreaView>
+            
+            <CustomAlert
+                visible={alertVisible}
+                title={alertInfo.title}
+                message={alertInfo.message}
+                onClose={() => setAlertVisible(false)}
+                onConfirm={alertInfo.onConfirm}
+                confirmText={alertInfo.confirmText}
+            />
         </ImageBackground>
     );
 }

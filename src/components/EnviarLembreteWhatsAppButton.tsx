@@ -1,8 +1,9 @@
-// EnviarLembreteWhatsAppButton.tsx
+// src/components/EnviarLembreteWhatsAppButton.tsx
 import React from 'react';
 import { TouchableOpacity, Linking, Alert, StyleSheet, StyleProp, ViewStyle } from 'react-native';
-import { StyledText as Text } from '../../src/components/StyledText';
+import { StyledText as Text } from './StyledText';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { ItemVenda } from '../types'; // ✨ Importa o tipo ItemVenda
 
 interface LembreteWhatsAppProps {
   clienteTelefone: string | undefined; 
@@ -15,6 +16,7 @@ interface LembreteWhatsAppProps {
   totalParcelas?: number;
   subtotal: number;
   desconto?: number;
+  itensVenda?: ItemVenda[]; // ✨ Adiciona a propriedade para receber os itens
   style?: StyleProp<ViewStyle>;
 }
 
@@ -29,6 +31,7 @@ const EnviarLembreteWhatsAppButton: React.FC<LembreteWhatsAppProps> = ({
   totalParcelas,
   subtotal,
   desconto,
+  itensVenda, // Recebe a nova propriedade
   style,
 }) => {
   const formatarTelefone = (telefoneInput: string): string => {
@@ -63,27 +66,34 @@ const EnviarLembreteWhatsAppButton: React.FC<LembreteWhatsAppProps> = ({
         return;
     }
 
-    let tipoLembrete = "sobre o pagamento da sua compra Natura";
+    //  Lógica para criar a lista de produtos formatada
+    let resumoProdutos = '';
+    if (itensVenda && itensVenda.length > 0) {
+        resumoProdutos = '*Resumo da sua compra:*\n' + itensVenda.map(item => {
+            const marca = item.marca ? ` (${item.marca})` : '';
+            return `- ${item.quantidade}x ${item.descricao}${marca}`;
+        }).join('\n');
+    }
+
+    let tipoLembrete = "sobre o pagamento da sua compra";
     if (tipoPagamento === 'Parcelado') {
         if (numeroParcela && totalParcelas) {
-            tipoLembrete = `da sua parcela ${numeroParcela}/${totalParcelas} Natura`;
+            tipoLembrete = `da sua parcela  ${numeroParcela}/${totalParcelas} da compra`;
         } else {
-            tipoLembrete = "da sua parcela Natura";
+            tipoLembrete = "da sua parcela";
         }
     }
 
-    // Lógica para montar a mensagem, agora incluindo o desconto
-    let mensagem = `Olá ${nomeCliente},\n\n`;
-    mensagem += `Estou passando só pra lembrar ${tipoLembrete}, da compra realizada em ${dataCompraFormatada}. `;
-    mensagem += `O valor de R$ ${valorLembrete.toFixed(2)} vence em ${dataVencimentoFormatada}.\n`;
-    mensagem += `Valor total da compra (sem desconto): R$ ${subtotal.toFixed(2)}.\n`;
-
-    // Adiciona a linha do desconto apenas se ele existir e for maior que zero
-    if (desconto && desconto > 0) {
-        mensagem += `(Desconto aplicado na compra: R$ ${desconto.toFixed(2)})\n`;
+    // Mensagem final atualizada para ser mais clara e incluir os produtos
+    let mensagem = `Olá ${nomeCliente}!\n\n`;
+    mensagem += `Estou passando para lembrar ${tipoLembrete} realizada em *${dataCompraFormatada}*.\n\n`;
+    
+    if (resumoProdutos) {
+        mensagem += `${resumoProdutos}\n\n`;
     }
 
-    mensagem += `\nObrigada desde já.`;
+    mensagem += `O valor de *R$ ${valorLembrete.toFixed(2)}* vence em *${dataVencimentoFormatada}*.\n\n`;
+    mensagem += `Obrigada desde já! 😊`;
 
     const mensagemCodificada = encodeURIComponent(mensagem);
     const url = `whatsapp://send?phone=${telefoneFormatado}&text=${mensagemCodificada}`;
@@ -113,7 +123,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#25D366', 
     flexDirection: 'row',
     alignItems: 'center',
-   justifyContent: 'center',
+    justifyContent: 'center',
   },
   textoBotaoLembrete: {
     color: 'white',
