@@ -13,14 +13,19 @@
       "backgroundColor": "#ffffff"
     },
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "infoPlist": {
+        "UIBackgroundModes": [
+          "fetch"
+        ]
+      }
     },
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/adaptive-icon.png",
         "backgroundColor": "#ffffff"
       },
-      "package": "com.seunome.cvsapp",
+      "package": "com.msvf.cvsapp",
       "versionCode": 12,
       "androidNavigationBar": {
         "backgroundColor": "#190a32",
@@ -55,7 +60,14 @@
       "expo-document-picker",
       "expo-font",
       "expo-image-picker",
-      "expo-navigation-bar"
+      "expo-navigation-bar",
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/images/notification-icon.png",
+          "color": "#FFFFFF"
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true
