@@ -1,18 +1,20 @@
-// app/_layout.tsx
 import { Stack, SplashScreen } from "expo-router";
 import React, { useEffect } from 'react';
 import { View, Text, StyleSheet, StatusBar, Platform, ActivityIndicator } from 'react-native';
 import { setupDatabase } from '../src/database/sqlite'; 
 import { executarMigracaoDeDados } from '../src/database/migration';
 import { useFonts } from 'expo-font';
-import { AppProvider, useAppContext } from '../src/contexts/AppContext'; // ✨ Importa o Contexto
+import { AppProvider, useAppContext } from '../src/contexts/AppContext';
+import { ThemeProvider } from "../src/contexts/ThemeContext";
+import { PremiumProvider } from "../src/contexts/PremiumContext";
+import { registerBackgroundTask } from '../src/services/notificationService';
 
 // Mantém a tela de splash nativa visível.
 SplashScreen.preventAutoHideAsync();
 
 // Componente principal que será envolvido pelo Provedor de Contexto
 function MainLayout() {
-  const { isDbReady, setIsDbReady } = useAppContext(); // ✨ Usa o contexto para saber se o DB está pronto
+  const { isDbReady, setIsDbReady } = useAppContext();
 
   const [fontsLoaded, fontError] = useFonts({
     'NotoSansJP': require('../assets/fonts/NotoSansJP-VariableFont_wght.ttf'),
@@ -24,22 +26,24 @@ function MainLayout() {
     'Roboto-Black': require('../assets/fonts/Roboto-Black.ttf'),
   });
 
-  // Efeito para preparar o banco de dados
+  // Efeito para preparar o banco de dados e registar a tarefa
   useEffect(() => {
-    const prepararBancoDeDados = async () => {
+    const prepararApp = async () => {
       try {
         await setupDatabase();
         await executarMigracaoDeDados();
         console.log("INICIALIZAÇÃO: Banco de dados e migração prontos.");
-        setIsDbReady(true); // ✨ Avisa para todo o app que o DB está pronto!
+        setIsDbReady(true);
+        
+        // ✨ 2. Regista a tarefa em segundo plano após o DB estar pronto
+        await registerBackgroundTask();
+
       } catch (error: any) {
         console.error("Falha crítica ao preparar a aplicação:", error);
-        // Em um caso real, você poderia navegar para uma tela de erro aqui.
-        // Por enquanto, o app ficará em tela de loading.
       }
     };
     
-    prepararBancoDeDados();
+    prepararApp();
   }, []); // Roda apenas uma vez
 
   // Efeito para esconder a splash screen quando TUDO estiver pronto
@@ -48,12 +52,16 @@ function MainLayout() {
       SplashScreen.hideAsync();
       console.log("INICIALIZAÇÃO: App pronto para iniciar.");
     }
-  }, [fontsLoaded, fontError, isDbReady]); // Roda quando fontes OU o DB mudarem de estado
+  }, [fontsLoaded, fontError, isDbReady]);
 
-  // Se o banco de dados OU as fontes ainda não estiverem prontos,
-  // mostra um loading genérico (a splash screen ainda estará visível por cima).
   if (!isDbReady || (!fontsLoaded && !fontError)) {
-    return null; // Retornar null é o ideal enquanto a splash screen está ativa
+    return (
+        <View style={styles.loadingContainer}>
+            <StatusBar barStyle="light-content" />
+            <ActivityIndicator size="large" color="#FFFFFF" />
+            <Text style={styles.loadingText}>A preparar o aplicativo...</Text>
+        </View>
+    );
   }
   
   // Se tudo estiver pronto, renderiza a navegação.
@@ -85,21 +93,33 @@ function MainLayout() {
       <Stack.Screen name="(gconfig)/Backup" />
       <Stack.Screen name="(gconfig)/Sobre" />
       <Stack.Screen name="(gconfig)/Cadastrousuario" />
+      {/*<Stack.Screen name="(gconfig)/AlterarSenha" />*/}
     </Stack>
   );
 }
 
-// ✨ A exportação padrão agora envolve o MainLayout com o AppProvider
 export default function RootLayout() {
   return (
     <AppProvider>
-      <MainLayout />
+        <ThemeProvider>
+            <PremiumProvider>
+                <MainLayout />
+            </PremiumProvider>
+        </ThemeProvider>
     </AppProvider>
   );
 }
 
-// Seus estilos de erro podem ser mantidos, mas a lógica de erro agora
-// pode ser gerenciada dentro do MainLayout se preferir.
 const styles = StyleSheet.create({
-    // ... seus estilos de erro aqui
+    loadingContainer: {
+        flex: 1,
+        justifyContent: 'center',
+        alignItems: 'center',
+        backgroundColor: '#190a32',
+    },
+    loadingText: {
+        marginTop: 15,
+        color: '#FFFFFF',
+        fontSize: 16,
+    }
 });

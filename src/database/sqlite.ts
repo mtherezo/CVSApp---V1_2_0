@@ -1,3 +1,4 @@
+// sqlite.ts
 import * as SQLite from 'expo-sqlite';
 import * as Crypto from 'expo-crypto';
 import { Cliente, Venda, Pagamento, ItemVenda, Usuario, Produto } from '../types';
@@ -5,8 +6,8 @@ import { Cliente, Venda, Pagamento, ItemVenda, Usuario, Produto } from '../types
 export const db = SQLite.openDatabaseSync('cvsapp.db');
 
 /**
- * Garante que sempre exista pelo menos um utilizador administrador na base de dados.
- * Se nenhum for encontrado, promove o primeiro utilizador da lista.
+ * Garante que sempre exista pelo menos um usuário administrador na base de dados.
+ * Se nenhum for encontrado, promove o primeiro usuário da lista.
  */
 export const garantirUsuarioAdmin = async () => {
     try {
@@ -187,24 +188,6 @@ export const atualizarVendaSQLite = async (venda: Partial<Pick<Venda, 'id' | 'pa
         await db.runAsync('UPDATE vendas SET parcelasPagas = ? WHERE id = ?;', venda.parcelasPagas, venda.id);
     }
 };
-export const buscarVendasComVencimentoHojeSQLite = async (): Promise<Venda[]> => {
-    const hoje = new Date().toISOString().split('T')[0];
-    const query = `
-        SELECT * FROM vendas 
-        WHERE 
-            ( tipoPagamento = 'Parcelado' AND DATE(dataPrimeiraParcela, '+' || (COALESCE(parcelasPagas, 0)) || ' month') = DATE(?) ) 
-            OR 
-            ( tipoPagamento = 'À Vista' AND DATE(dataVenda, '+30 day') = DATE(?) )
-    `;
-    const vendasIncompletas = await db.getAllAsync<Venda>(query, hoje, hoje);
-    if (vendasIncompletas.length === 0) return [];
-    const vendasCompletas = await Promise.all(vendasIncompletas.map(v => listarVendaPorIdSQLite(v.id)));
-    return vendasCompletas.filter((v): v is Venda => {
-        if (!v) return false;
-        const totalPago = v.pagamentos?.reduce((acc, p) => acc + p.valorPago, 0) || 0;
-        return v.valorTotal > totalPago;
-    });
-};
 export const excluirVendaSQLite = async (idVenda: string) => {
     await db.withTransactionAsync(async () => {
         const itensDaVenda = await db.getAllAsync<ItemVenda>(
@@ -271,3 +254,60 @@ export const atualizarEstoqueProdutoSQLite = async (idProduto: string, quantidad
         idProduto
     );
 };
+
+//  FUNÇÃO PARA NOTIFICAÇÕES UM DIA ANTES DO VENCIMENTO
+export const buscarVendasComVencimentoHojeSQLite = async (): Promise<Venda[]> => {
+    
+    const amanha = new Date();
+    amanha.setDate(amanha.getDate() + 1); // Adiciona 1 dia à data atual
+    const dataDeAmanhaFormatada = amanha.toISOString().split('T')[0];
+
+    const query = `
+        SELECT * FROM vendas 
+        WHERE 
+            ( tipoPagamento = 'Parcelado' AND DATE(dataPrimeiraParcela, '+' || (COALESCE(parcelasPagas, 0)) || ' month') = DATE(?) ) 
+            OR 
+            ( tipoPagamento = 'À Vista' AND DATE(dataVenda, '+30 day') = DATE(?) )
+    `;
+    
+    // Agora a query usa a data de amanhã para a verificação
+    const vendasIncompletas = await db.getAllAsync<Venda>(query, dataDeAmanhaFormatada, dataDeAmanhaFormatada);
+    
+    if (vendasIncompletas.length === 0) return [];
+
+    const vendasCompletas = await Promise.all(
+        vendasIncompletas.map(v => listarVendaPorIdSQLite(v.id))
+    );
+    
+    return vendasCompletas.filter((v): v is Venda => {
+        if (!v) return false;
+        const totalPago = v.pagamentos?.reduce((acc, p) => acc + p.valorPago, 0) || 0;
+        return v.valorTotal > totalPago;
+    });
+};
+
+//  FUNÇÃO PARA NOTIFICAÇÕES NO DIA DO VENCIMENTO
+{/*xport const buscarVendasComVencimentoHojeSQLite = async (): Promise<Venda[]> => {
+    const hoje = new Date().toISOString().split('T')[0];
+    const query = `
+        SELECT * FROM vendas 
+        WHERE 
+            ( tipoPagamento = 'Parcelado' AND DATE(dataPrimeiraParcela, '+' || (COALESCE(parcelasPagas, 0)) || ' month') = DATE(?) ) 
+            OR 
+            ( tipoPagamento = 'À Vista' AND DATE(dataVenda, '+30 day') = DATE(?) )
+    `;
+    const vendasIncompletas = await db.getAllAsync<Venda>(query, hoje, hoje);
+    if (vendasIncompletas.length === 0) return [];
+
+    const vendasCompletas = await Promise.all(
+        vendasIncompletas.map(v => listarVendaPorIdSQLite(v.id))
+    );
+    
+    return vendasCompletas.filter((v): v is Venda => {
+        if (!v) return false;
+        const totalPago = v.pagamentos?.reduce((acc, p) => acc + p.valorPago, 0) || 0;
+        return v.valorTotal > totalPago;
+    });
+};*/}
+
+

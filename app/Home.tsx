@@ -52,6 +52,7 @@ export default function Home() {
         >
             <View style={styles.overlay} />
             <SafeAreaView style={styles.safeArea}>
+                
                 <ScrollView contentContainerStyle={styles.scrollContainer}>
                     <View style={styles.headerContainer}>
                         <Text style={styles.title}>Bem-vindo(a) de volta,</Text>

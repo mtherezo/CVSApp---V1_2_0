@@ -2,7 +2,7 @@
   "expo": {
     "name": "CVSApp",
     "slug": "CVSApp",
-    "version": "3.2.0",
+    "version": "3.2.1",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "cvsapp",
@@ -13,7 +13,12 @@
       "backgroundColor": "#ffffff"
     },
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "infoPlist": {
+        "UIBackgroundModes": [
+          "fetch"
+        ]
+      }
     },
     "android": {
       "adaptiveIcon": {
@@ -21,7 +26,8 @@
         "backgroundColor": "#ffffff"
       },
       "package": "com.seunome.cvsapp",
-      "versionCode": 12,
+      "versionCode": 13,
+      
       "androidNavigationBar": {
         "backgroundColor": "#190a32",
         "barStyle": "light-content"
@@ -55,7 +61,14 @@
       "expo-document-picker",
       "expo-font",
       "expo-image-picker",
-      "expo-navigation-bar"
+      "expo-navigation-bar",
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/images/notification-icon.png",
+          "color": "#FFFFFF"
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true

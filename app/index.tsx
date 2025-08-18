@@ -124,7 +124,7 @@ export default function TelaLoginScreen() {
                     >
                         <ScrollView contentContainerStyle={styles.scrollContainer}>
                             <View style={styles.logoContainer}>
-                                <MaterialCommunityIcons name="shield-check-outline" size={80} color="#71d44aff" />
+                                <MaterialCommunityIcons name="point-of-sale" size={80} color="#71d44aff" />
                                 <Text style={styles.appName}>CVSApp</Text>
                                 <Text style={styles.screenTitle}>Acesso da Consultora</Text>
                             </View>

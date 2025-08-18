@@ -27,7 +27,7 @@ export default function SobreScreen() {
 
                 <ScrollView contentContainerStyle={styles.scrollContainer}>
                     <View style={styles.contentContainer}>
-                        <MaterialCommunityIcons name="shield-check-outline" size={80} color="#71d44aff" />
+                        <MaterialCommunityIcons name="point-of-sale" size={80} color="#71d44aff" />
                         <Text style={styles.appName}>CVSApp</Text>
                         {appVersion && <Text style={styles.versionText}>Versão {appVersion}</Text>}
                         
@@ -37,7 +37,10 @@ export default function SobreScreen() {
                         
                         <View style={styles.infoBox}>
                             <Text style={styles.infoTitle}>Desenvolvido por:</Text>
-                            <Text style={styles.infoContent}>Msvf</Text>
+                            <Text>
+                                <Text style={styles.infoContent}>Msvf </Text>
+                                <Text style={styles.infoContents}>©2025</Text>
+                            </Text>
                         </View>
                     </View>
                 </ScrollView>
@@ -81,5 +84,12 @@ const styles = StyleSheet.create({
         fontFamily: 'Playwrite-Regular',
         color: '#FFFFFF',
         marginTop: 5,
+    },
+    infoContents: {
+        fontSize: 7,
+        fontFamily: 'Playwrite-Regular',
+        color: '#FFFFFF',
+        marginTop: 5,
     }
+
 });
