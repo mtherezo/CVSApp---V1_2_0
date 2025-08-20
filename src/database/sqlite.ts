@@ -277,4 +277,19 @@ export const buscarVendasComVencimentoHojeSQLite = async (): Promise<Venda[]> =>
         const totalPago = v.pagamentos?.reduce((acc, p) => acc + p.valorPago, 0) || 0;
         return v.valorTotal > totalPago;
     });
+    
+};
+export const contarClientesSQLite = async (): Promise<number> => {
+    const result = await db.getFirstAsync<{ count: number }>('SELECT COUNT(*) as count FROM clientes;');
+    return result?.count ?? 0;
+};
+
+export const contarProdutosSQLite = async (): Promise<number> => {
+    const result = await db.getFirstAsync<{ count: number }>('SELECT COUNT(*) as count FROM produtos;');
+    return result?.count ?? 0;
+};
+
+export const contarVendasSQLite = async (): Promise<number> => {
+    const result = await db.getFirstAsync<{ count: number }>('SELECT COUNT(*) as count FROM vendas;');
+    return result?.count ?? 0;
 };

@@ -93,7 +93,7 @@ function MainLayout() {
       <Stack.Screen name="(gconfig)/Backup" />
       <Stack.Screen name="(gconfig)/Sobre" />
       <Stack.Screen name="(gconfig)/Cadastrousuario" />
-      {/*<Stack.Screen name="(gconfig)/AlterarSenha" />*/}
+      
     </Stack>
   );
 }

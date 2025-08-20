@@ -23,7 +23,7 @@ TaskManager.defineTask(NOTIFICATION_TASK_NAME, async () => {
           body: `Você tem ${totalVendas} venda${plural} com vencimento hoje. Toque para ver os detalhes.`,
           sound: true,
           priority: Notifications.AndroidNotificationPriority.HIGH,
-          data: { screen: 'Todasvendas' }, // Para onde levar o utilizador ao tocar
+          data: { screen: 'Todasvendas' }, // Para onde levar o usuário ao tocar
         },
         trigger: null,
       });
@@ -54,7 +54,7 @@ export async function registerBackgroundTask() {
       return;
     }
 
-    // Agenda a tarefa para rodar a cada 12 horas (o sistema operativo decide o melhor momento)
+    // Agenda a tarefa para rodar a cada 12 horas (o sistema operacional decide o melhor momento)
     await BackgroundFetch.registerTaskAsync(NOTIFICATION_TASK_NAME, {
       minimumInterval: 60 * 60 * 12, // 12 horas em segundos
       stopOnTerminate: false,

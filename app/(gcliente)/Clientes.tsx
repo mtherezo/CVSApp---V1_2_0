@@ -1,14 +1,14 @@
-// (gcliente) Clientes.tsx
-import React, { useState, useCallback, useEffect } from 'react';
-import { View, FlatList, StyleSheet, TouchableOpacity, ImageBackground, ActivityIndicator, RefreshControl, Platform, SafeAreaView, StatusBar,} from 'react-native';
+import React, { useState, useCallback } from 'react';
+import { View, FlatList, StyleSheet, TouchableOpacity, Alert, ImageBackground, ActivityIndicator, RefreshControl, Platform, SafeAreaView, StatusBar,} from 'react-native';
 import { StyledText as Text } from '../../src/components/StyledText';
 import { Cliente } from '../../src/types';
 import { useRouter, useFocusEffect } from 'expo-router';
-import { listarClientesSQLite, excluirClienteSQLite } from '../../src/database/sqlite';
+import { listarClientesSQLite, excluirClienteSQLite, contarClientesSQLite } from '../../src/database/sqlite';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAppContext } from '../../src/contexts/AppContext';
 import CustomAlert from '../../src/components/CustomAlert';
+import { usePremium } from '../../src/contexts/PremiumContext';
 
 export default function ClientesScreen() {
     const [clientes, setClientes] = useState<Cliente[]>([]);
@@ -19,17 +19,11 @@ export default function ClientesScreen() {
     const router = useRouter();
     const insets = useSafeAreaInsets();
     const { isDbReady } = useAppContext();
+    const { isPremium } = usePremium();
 
-    // Estados para controlar o CustomAlert
     const [alertVisible, setAlertVisible] = useState(false);
-    const [alertInfo, setAlertInfo] = useState({
-        title: '',
-        message: '',
-        onConfirm: undefined as (() => void) | undefined,
-        confirmText: 'Ok'
-    });
+    const [alertInfo, setAlertInfo] = useState({ title: '', message: '', onConfirm: undefined as (() => void) | undefined, confirmText: 'Ok' });
 
-    //  Função auxiliar para mostrar o alerta
     const showAlert = (title: string, message: string, onConfirm?: () => void, confirmText = 'Ok') => {
         setAlertInfo({ title, message, onConfirm, confirmText });
         setAlertVisible(true);
@@ -69,13 +63,12 @@ export default function ClientesScreen() {
             return;
         }
 
-        // Lógica de exclusão agora usa o CustomAlert
         showAlert(
             'Confirmar Exclusão',
             `Tem certeza que deseja excluir o cliente "${clienteSelecionado.nome}"? Todas as vendas associadas também serão excluídas.`,
             async () => {
                 setIsDeleting(true);
-                setAlertVisible(false); // Fecha o alerta para mostrar o loading
+                setAlertVisible(false);
                 try {
                     await excluirClienteSQLite(clienteSelecionado.id);
                     setClienteSelecionado(null);
@@ -91,12 +84,35 @@ export default function ClientesScreen() {
         );
     };
 
+    const handleNovoClientePress = async () => {
+        if (isPremium) {
+            router.push('/(gcliente)/Cadastrocliente');
+            return;
+        }
+
+        try {
+            const totalClientes = await contarClientesSQLite();
+            if (totalClientes >= 5) {
+                showAlert(
+                    "Limite Atingido",
+                    "A versão gratuita permite o registo de até 5 clientes. Faça o upgrade para a versão completa para registar clientes ilimitados!",
+                    () => {
+                        setAlertVisible(false);
+                        // router.push('/(gconfig)/Upgrade');
+                    },
+                    "Fazer Upgrade"
+                );
+            } else {
+                router.push('/(gcliente)/Cadastrocliente');
+            }
+        } catch (error) {
+            showAlert("Erro", "Não foi possível verificar os limites. Tente novamente.");
+        }
+    };
+
     const renderItemCliente = ({ item }: { item: Cliente }) => (
         <TouchableOpacity
-            style={[
-                styles.cardCliente,
-                clienteSelecionado?.id === item.id && styles.itemSelecionado,
-            ]}
+            style={[styles.cardCliente, clienteSelecionado?.id === item.id && styles.itemSelecionado]}
             onPress={() => clienteSelecionado?.id === item.id ? setClienteSelecionado(null) : setClienteSelecionado(item)}
             disabled={isDeleting}
         >
@@ -151,15 +167,14 @@ export default function ClientesScreen() {
                         </View>
                     }
                     contentContainerStyle={styles.listContentContainer}
-                    refreshControl={
-                        <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#FFFFFF" />
-                    }
+                    refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#FFFFFF" />}
                 />
 
+                {/* ✨ CORREÇÃO: BOTÕES RESTAURADOS NO RODAPÉ */}
                 <View style={[styles.footerAcoes, { paddingBottom: insets.bottom > 0 ? insets.bottom : 12 }]}>
                     <TouchableOpacity
                         style={[styles.botaoAcao, (isDeleting) && styles.disabledButton]}
-                        onPress={() => router.push('/(gcliente)/Cadastrocliente')}
+                        onPress={handleNovoClientePress}
                         disabled={isDeleting}
                     >
                         <MaterialCommunityIcons name="account-plus-outline" size={22} color="#FFFFFF" />
@@ -197,8 +212,6 @@ export default function ClientesScreen() {
                     </TouchableOpacity>
                 </View>
             </SafeAreaView>
-
-            {/*  Renderiza o CustomAlert aqui */}
             <CustomAlert
                 visible={alertVisible}
                 title={alertInfo.title}
