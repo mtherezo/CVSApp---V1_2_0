@@ -286,6 +286,38 @@ export const buscarVendasComVencimentoHojeSQLite = async (): Promise<Venda[]> =>
     });
 };
 
+// NOVA FUNÇÃO ADICIONADA
+/**
+ * Busca todos os clientes que têm vendas não quitadas com vencimento numa data específica.
+ * @param dataVencimento A data para a busca no formato 'YYYY-MM-DD'.
+ */
+export const buscarClientesPorDataVencimentoSQLite = async (dataVencimento: string): Promise<Cliente[]> => {
+    const query = `
+        SELECT DISTINCT c.*
+        FROM clientes c
+        JOIN vendas v ON c.id = v.idCliente
+        WHERE
+            -- Garante que a venda ainda não está quitada
+            COALESCE((SELECT SUM(p.valorPago) FROM pagamentos p WHERE p.idVenda = v.id), 0) < v.valorTotal AND
+            (
+                -- Lógica para vendas parceladas: a próxima parcela vence na data especificada
+                (v.tipoPagamento = 'Parcelado' AND DATE(v.dataPrimeiraParcela, '+' || COALESCE(v.parcelasPagas, 0) || ' month') = DATE(?))
+                OR
+                -- Lógica para vendas à vista (ex: vencimento em 30 dias) que ainda não tiveram pagamentos
+                (v.tipoPagamento = 'À Vista' AND (SELECT COUNT(*) FROM pagamentos WHERE idVenda = v.id) = 0 AND DATE(v.dataVenda, '+30 day') = DATE(?))
+            )
+        ORDER BY c.nome ASC
+    `;
+
+    try {
+        const clientes = await db.getAllAsync<Cliente>(query, dataVencimento, dataVencimento);
+        return clientes;
+    } catch (error) {
+        console.error("Erro ao buscar clientes por data de vencimento:", error);
+        return [];
+    }
+};
+
 //  FUNÇÃO PARA NOTIFICAÇÕES NO DIA DO VENCIMENTO
 {/*xport const buscarVendasComVencimentoHojeSQLite = async (): Promise<Venda[]> => {
     const hoje = new Date().toISOString().split('T')[0];

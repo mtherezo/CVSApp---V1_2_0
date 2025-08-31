@@ -184,7 +184,7 @@ export default function CadastroVendaScreen() {
                     const quantidadeOriginal = vendaOriginal?.itens.find(i => i.idProduto === itemVenda.idProduto)?.quantidade || 0;
                     
                     if (itemVenda.quantidade > estoqueDisponivel + quantidadeOriginal) {
-                        // ✨ CORREÇÃO: Mostra um alerta e para a função, em vez de lançar um erro.
+                        // Mostra um alerta e para a função, em vez de lançar um erro.
                         Alert.alert(
                             "Estoque Insuficiente",
                             `Não há Estoque suficiente para "${itemVenda.descricao}".\nDisponível: ${estoqueDisponivel}.`
