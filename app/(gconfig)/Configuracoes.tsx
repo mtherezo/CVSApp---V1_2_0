@@ -50,10 +50,11 @@ export default function ConfiguracoesScreen() {
     };
 
     const configButtons: { title: string; icon: IconName; color: string; onPress: () => void; adminOnly: boolean }[] = [
-        { title: 'Backup e Restauração', icon: 'database-export-outline', color: '#FFCC80', onPress: () => router.push('/(gconfig)/Backup'), adminOnly: false },
-        { title: 'Gerenciar Usuários', icon: 'account-cog-outline', color: '#FFCC80', onPress: () => router.push({ pathname: '/(gconfig)/Cadastrousuario', params: { username: loggedInUsername } }), adminOnly: true },
+        //{ title: 'Backup e Restauração', icon: 'database-export-outline', color: '#FFCC80', onPress: () => router.push('/(gconfig)/Backup'), adminOnly: false },
+        //{ title: 'Gerenciar Usuários', icon: 'account-cog-outline', color: '#FFCC80', onPress: () => router.push({ pathname: '/(gconfig)/Cadastrousuario', params: { username: loggedInUsername } }), adminOnly: true },
         { title: 'Fale Conosco / Suporte', icon: 'email-outline', color: '#81D4FA', onPress: handleFaleConosco, adminOnly: false },
-        { title: 'Sobre o Aplicativo', icon: 'information-outline', color: '#BDBDBD', onPress: () => router.push('/(gconfig)/Sobre'), adminOnly: false },
+        //{ title: 'Sobre o Aplicativo', icon: 'information-outline', color: '#BDBDBD', onPress: () => router.push('/(gconfig)/Sobre'), adminOnly: false },
+        { title: 'Sobre o Aplicativo', icon: 'information-outline', color: '#BDBDBD', onPress: () => router.push('/(gconfig)/Sobre_limitada'), adminOnly: false },
     ];
 
     return (
@@ -83,8 +84,8 @@ export default function ConfiguracoesScreen() {
                                 trackColor={{ false: "#767577", true: "#4CAF50" }}
                                 thumbColor={notificacoesAtivas ? "#FFFFFF" : "#f4f3f4"}
                                 ios_backgroundColor="#3e3e3e"
-                                onValueChange={handleToggleNotificacoes}
-                                value={notificacoesAtivas}
+                               // onValueChange={handleToggleNotificacoes}
+                                //value={notificacoesAtivas}
                             />
                         </View>
                     </View>

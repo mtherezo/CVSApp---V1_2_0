@@ -24,4 +24,5 @@ const styles = StyleSheet.create({
     // Define 'Roboto-Regular' como a fonte padrão para TODO o texto no app.
     fontFamily: 'Roboto-Regular',
   },
+  
 });

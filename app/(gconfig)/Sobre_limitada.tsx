@@ -29,10 +29,10 @@ export default function SobreScreen() {
                     <View style={styles.contentContainer}>
                         <MaterialCommunityIcons name="point-of-sale" size={80} color="#71d44aff" />
                         <Text style={styles.appName}>CVSApp</Text>
-                        {appVersion && <Text style={styles.versionText}>Versão{appVersion}</Text>}
+                        {appVersion && <Text style={styles.versionText}>Versão Grátis {appVersion}</Text>}
                         
                         <Text style={styles.descriptionText}>
-                            Este aplicativo foi desenvolvido para auxiliar consultoras a gerenciar suas vendas, clientes e produtos de forma simples e eficiente.
+                            Esta é uma versão Grátis e limitada do Aplicativo desenvolvido para auxiliar consultoras a gerenciar suas vendas, clientes e produtos de forma simples e eficiente, caso queira a versão completa acesse a Play store e pesquise CVSAPP Consultora.
                         </Text>
                         
                         <View style={styles.infoBox}>

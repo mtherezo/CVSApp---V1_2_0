@@ -11,11 +11,12 @@ type IconName = React.ComponentProps<typeof MaterialCommunityIcons>['name'];
 
 const navButtons = [
     { title: 'Gerenciar Clientes', icon: 'account-group-outline', pathname: '/Clientes', color: '#81D4FA' },
-    { title: 'Catálogo de Produtos', icon: 'package-variant-closed', pathname: '/Produtos', color: '#81D4FA' },
+    //{ title: 'Catálogo de Produtos', icon: 'package-variant-closed', pathname: '/Produtos', color: '#81D4FA' },
     { title: 'Pesquisar Vendas', icon: 'magnify', pathname: '/Pesquisarvendascliente', color: '#A5D6A7' },
-    { title: 'Histórico de Vendas', icon: 'history', pathname: '/Todasvendas', color: '#A5D6A7' },
-    { title: 'Relatórios de Vendas', icon: 'file-chart-outline', pathname: '/Gerarrelatorios', color: '#A5D6A7' },
+    //{ title: 'Histórico de Vendas', icon: 'history', pathname: '/Todasvendas', color: '#A5D6A7' },
+    //{ title: 'Relatórios de Vendas', icon: 'file-chart-outline', pathname: '/Gerarrelatorios', color: '#A5D6A7' },
     { title: 'Configurações', icon: 'cog-outline', pathname: '/Configuracoes', color: '#BDBDBD' },
+    { title: 'Versão completa', icon: 'account-lock-open-outline', pathname: '/Sobre_limitada', color: '#BDBDBD' },
 ] as const;
 
 export default function Home() {
@@ -83,7 +84,7 @@ export default function Home() {
 
                     {appVersion && (
                         <Text style={styles.versionText}>
-                            Versão {appVersion}
+                            Versão Limitada {appVersion}
                         </Text>
                     )}
                 </ScrollView>

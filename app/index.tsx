@@ -174,7 +174,7 @@ export default function TelaLoginScreen() {
                             
                             {appVersion && (
                                 <Text style={styles.versionText}>
-                                    Versão {appVersion}
+                                    Versão Limitada {appVersion}
                                 </Text>
                             )}
 

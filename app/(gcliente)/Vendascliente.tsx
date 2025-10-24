@@ -1,4 +1,4 @@
-//Vendasclientes.tsx
+// Vendasclientes.tsx
 import React, { useState, useCallback, useMemo } from 'react';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { StyledText as Text } from '../../src/components/StyledText';
@@ -10,7 +10,6 @@ import { Venda } from '../../src/types';
 import EnviarLembreteWhatsAppButton from '../../src/components/EnviarLembreteWhatsAppButton';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 
-// Define os tipos de filtro possíveis
 type FiltroStatus = 'todas' | 'pendentes' | 'parciais' | 'quitadas';
 
 export default function VendasClienteScreen() {
@@ -113,7 +112,6 @@ export default function VendasClienteScreen() {
         const saldoDevedorItem = item.valorTotal - valorPago;
         const progresso = item.valorTotal > 0 ? (valorPago / item.valorTotal) * 100 : (valorPago > 0 ? 100 : 0);
         
-        //  LÓGICA PARA DETERMINAR O STATUS E O ESTILO
         const getStatusInfo = () => {
             if (saldoDevedorItem <= 0.001) {
                 return { text: 'Pagamento Quitado', style: styles.statusQuitada };
@@ -153,7 +151,6 @@ export default function VendasClienteScreen() {
                             </Text>
                         )}
                     </View>
-                    {/* USA O STATUS E ESTILO DINÂMICOS */}
                     <Text style={statusInfo.style}>
                         {statusInfo.text}
                     </Text>
@@ -192,6 +189,7 @@ export default function VendasClienteScreen() {
                 </View>
 
                 <View style={styles.botoesAcaoCard}>
+                    {/* Botão Lembrete */}
                     {saldoDevedorItem > 0.001 && telefoneCliente && (
                         <EnviarLembreteWhatsAppButton
                             style={styles.botaoCard}
@@ -208,16 +206,31 @@ export default function VendasClienteScreen() {
                             itensVenda={item.itens}
                         />
                     )}
-                    
-                    <TouchableOpacity style={[styles.botaoCard, styles.botaoEditar]} onPress={() => router.push({ pathname: '/(gvenda)/Cadastrovenda', params: { idVenda: item.id, idCliente: idCliente, nome: nomeCliente, telefone: telefoneCliente, } })}>
-                        <MaterialCommunityIcons name="pencil-outline" size={24} color="#FFFFFF" />
+
+                    {/* Botão Editar - DESATIVADO */}
+                    <TouchableOpacity
+                        style={[styles.botaoCard, styles.botaoEditar, styles.botaoDesativado]}
+                        onPress={() => {}}
+                        disabled={true}
+                    >
+                        <MaterialCommunityIcons name="pencil-outline" size={24} color="#AAAAAA" />
                     </TouchableOpacity>
-                    
-                    <TouchableOpacity style={[styles.botaoCard, styles.botaoDetalhes]} onPress={() => router.push({ pathname: './Parcelasvendacliente', params: { idVenda: item.id } })}>
-                        <MaterialCommunityIcons name="cash-multiple" size={24} color="#FFFFFF" />
+
+                    {/* Botão Pagamentos - DESATIVADO */}
+                    <TouchableOpacity
+                        style={[styles.botaoCard, styles.botaoDetalhes, styles.botaoDesativado]}
+                        onPress={() => {}}
+                        disabled={true}
+                    >
+                        <MaterialCommunityIcons name="cash-multiple" size={24} color="#AAAAAA" />
                     </TouchableOpacity>
-                                        
-                    <TouchableOpacity style={[styles.botaoCard, styles.botaoExcluir, isDeleting === item.id && styles.disabledButton]} onPress={() => confirmarExclusaoVenda(item)} disabled={isDeleting === item.id}>
+
+                    {/* Botão Excluir */}
+                    <TouchableOpacity 
+                        style={[styles.botaoCard, styles.botaoExcluir, isDeleting === item.id && styles.disabledButton]} 
+                        onPress={() => confirmarExclusaoVenda(item)} 
+                        disabled={isDeleting === item.id}
+                    >
                         {isDeleting === item.id ? 
                             <ActivityIndicator size="small" color="#FFFFFF" /> : 
                             <MaterialCommunityIcons name="delete-outline" size={24} color="#FFFFFF" />
@@ -307,6 +320,8 @@ export default function VendasClienteScreen() {
     );
 }
 
+
+
 const styles = StyleSheet.create({
     background: { flex: 1 },
     overlay: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(25, 10, 50, 0.65)' },
@@ -358,5 +373,7 @@ const styles = StyleSheet.create({
     footerAcoes: { position: 'absolute', bottom: 0, left: 0, right: 0, paddingHorizontal: 20, paddingTop: 20, backgroundColor: 'rgba(25, 10, 50, 0.9)', borderTopWidth: 1, borderTopColor: 'rgba(255, 255, 255, 0.1)', },
     botaoPrincipal: { backgroundColor: '#4CAF50', flexDirection: 'row', paddingVertical: 15, borderRadius: 25, alignItems: 'center', justifyContent: 'center', },
     textoBotaoPrincipal: { color: 'white', fontSize: 17, marginLeft: 10, fontFamily: 'Roboto-Bold' },
-    disabledButton: { opacity: 0.5 },
+    disabledButton: { opacity: 0.5 }, botaoDesativado: {
+        backgroundColor: '#C1C1C1',
+    },
 });

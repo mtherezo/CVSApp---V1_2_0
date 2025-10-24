@@ -318,6 +318,22 @@ export const buscarClientesPorDataVencimentoSQLite = async (dataVencimento: stri
     }
 };
 
+// --- FUNÇÕES DE CONTAGEM PARA LIMITES ---
+
+{/*export const contarClientesSQLite = async (): Promise<number> => {
+    const result = await db.getFirstAsync<{ count: number }>('SELECT COUNT(*) as count FROM clientes;');
+    return result?.count ?? 0;
+};
+
+export const contarProdutosSQLite = async (): Promise<number> => {
+    const result = await db.getFirstAsync<{ count: number }>('SELECT COUNT(*) as count FROM produtos;');
+    return result?.count ?? 0;
+};
+
+export const contarVendasSQLite = async (): Promise<number> => {
+    const result = await db.getFirstAsync<{ count: number }>('SELECT COUNT(*) as count FROM vendas;');
+    return result?.count ?? 0;
+};
 //  FUNÇÃO PARA NOTIFICAÇÕES NO DIA DO VENCIMENTO
 {/*xport const buscarVendasComVencimentoHojeSQLite = async (): Promise<Venda[]> => {
     const hoje = new Date().toISOString().split('T')[0];
