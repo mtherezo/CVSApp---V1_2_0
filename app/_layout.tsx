@@ -59,7 +59,7 @@ function MainLayout() {
         <View style={styles.loadingContainer}>
             <StatusBar barStyle="light-content" />
             <ActivityIndicator size="large" color="#FFFFFF" />
-            <Text style={styles.loadingText}>A preparar o aplicativo...</Text>
+            <Text style={styles.loadingText}>Preparando o aplicativo...</Text>
         </View>
     );
   }
